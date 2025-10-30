@@ -1,9 +1,10 @@
 // --- CONSTANTS ---
 const LOCAL_STORAGE_KEY_THEME = 'instagram_feed_theme';
 const LOCAL_STORAGE_KEY_GROUPS = 'instagram_feed_hidden_groups';
-const LOCAL_STORAGE_KEY_ACCOUNTS = 'instagram_feed_hidden_accounts';
+// New key for tracking a single, exclusively selected account
+const LOCAL_STORAGE_KEY_SELECTED_ACCOUNT = 'instagram_feed_selected_account'; 
 
-// --- DARK MODE LOGIC ---
+// --- DARK MODE LOGIC (Unchanged) ---
 
 /**
  * Sets up the dark mode toggle and loads the saved theme preference.
@@ -43,7 +44,7 @@ function setupDarkMode() {
 
 // --- FILTERING AND SORTING LOGIC ---
 
-// --- Group Filtering ---
+// --- Group Filtering (Inclusive/Exclusion Logic - Unchanged) ---
 
 /**
  * Loads the set of hidden account GROUP IDs from localStorage.
@@ -74,7 +75,7 @@ function saveHiddenGroups(hiddenGroups) {
  */
 function createGroupToggles(uniqueGroups, hiddenGroups) {
     const controlBar = document.getElementById('group-filter-controls');
-    controlBar.innerHTML = '<span class="text-sm font-semibold pr-3 text-gray-500 dark:text-gray-400">Filter by Group:</span>';
+    controlBar.innerHTML = '<span class="text-sm font-semibold pr-3 text-gray-500 dark:text-gray-400">Filter by Group (Exclusion):</span>';
     
     // Sort groups by ID (e.g., "0", "1")
     const sortedGroups = Array.from(uniqueGroups).sort((a, b) => a.id.localeCompare(b.id));
@@ -85,6 +86,7 @@ function createGroupToggles(uniqueGroups, hiddenGroups) {
         button.textContent = `Group ${group.id}: ${group.name}`; 
         button.setAttribute('data-group-id', group.id);
         
+        // Button is active if the group is NOT hidden
         const isActive = !hiddenGroups.has(group.id);
         if (isActive) {
             button.classList.add('active');
@@ -95,15 +97,16 @@ function createGroupToggles(uniqueGroups, hiddenGroups) {
             const isActiveState = e.target.classList.contains('active');
             
             if (isActiveState) {
+                // If currently active (visible), clicking HIDES/EXCLUDES it
                 hiddenGroups.add(id);
                 e.target.classList.remove('active');
             } else {
+                // If currently inactive (hidden), clicking INCLUDES it
                 hiddenGroups.delete(id);
                 e.target.classList.add('active');
             }
 
             saveHiddenGroups(hiddenGroups);
-            // Re-render the feed using the globally available postData and current account filters
             loadInstagramFeed(false); 
         });
 
@@ -112,38 +115,35 @@ function createGroupToggles(uniqueGroups, hiddenGroups) {
 }
 
 
-// --- Account Filtering ---
+// --- Account Filtering (Exclusive/Inclusion Logic - NEW) ---
 
 /**
- * Loads the set of hidden account usernames from localStorage.
- * @returns {Set<string>} A Set of usernames that are currently hidden.
+ * Loads the single exclusively selected account username from localStorage.
+ * @returns {string | null} The username, or null if no account is selected.
  */
-function loadHiddenAccounts() {
-    const savedFilters = localStorage.getItem(LOCAL_STORAGE_KEY_ACCOUNTS);
-    if (savedFilters) {
-        try {
-            return new Set(JSON.parse(savedFilters));
-        } catch (e) {
-            console.error("Failed to parse account filter preferences:", e);
-        }
-    }
-    return new Set();
+function loadSelectedAccount() {
+    return localStorage.getItem(LOCAL_STORAGE_KEY_SELECTED_ACCOUNT);
 }
 
 /**
- * Saves the set of hidden account usernames to localStorage.
- * @param {Set<string>} hiddenAccounts The set of usernames.
+ * Saves the single exclusively selected account username to localStorage.
+ * @param {string | null} username The username to select, or null to clear selection.
  */
-function saveHiddenAccounts(hiddenAccounts) {
-    localStorage.setItem(LOCAL_STORAGE_KEY_ACCOUNTS, JSON.stringify(Array.from(hiddenAccounts)));
+function saveSelectedAccount(username) {
+    if (username) {
+        localStorage.setItem(LOCAL_STORAGE_KEY_SELECTED_ACCOUNT, username);
+    } else {
+        localStorage.removeItem(LOCAL_STORAGE_KEY_SELECTED_ACCOUNT);
+    }
 }
 
 /**
  * Creates and attaches the filter toggle buttons for individual accounts (usernames).
+ * This uses an EXCLUSIVE selection model (only one can be active).
  */
-function createAccountToggles(uniqueAccounts, hiddenAccounts) {
+function createAccountToggles(uniqueAccounts, selectedAccount) {
     const controlBar = document.getElementById('account-filter-controls');
-    controlBar.innerHTML = '<span class="text-sm font-semibold pr-3 text-gray-500 dark:text-gray-400">Filter by Account:</span>';
+    controlBar.innerHTML = '<span class="text-sm font-semibold pr-3 text-gray-500 dark:text-gray-400">Filter by Account (Exclusive):</span>';
 
     // Sort accounts by username
     const sortedAccounts = Array.from(uniqueAccounts).sort();
@@ -153,25 +153,29 @@ function createAccountToggles(uniqueAccounts, hiddenAccounts) {
         button.textContent = `@${username}`; // Display with '@' prefix
         button.setAttribute('data-username', username);
         
-        const isActive = !hiddenAccounts.has(username);
+        // Button is active if it is the currently selected account
+        const isActive = username === selectedAccount;
         if (isActive) {
             button.classList.add('active');
         }
 
         button.addEventListener('click', (e) => {
             const usernameToToggle = e.target.getAttribute('data-username');
-            const isActiveState = e.target.classList.contains('active');
+            const currentSelection = loadSelectedAccount();
+            let newSelection = null;
             
-            if (isActiveState) {
-                hiddenAccounts.add(usernameToToggle);
-                e.target.classList.remove('active');
+            if (currentSelection === usernameToToggle) {
+                // If already selected, clear the selection
+                newSelection = null; 
             } else {
-                hiddenAccounts.delete(usernameToToggle);
-                e.target.classList.add('active');
+                // If not selected, select this account exclusively
+                newSelection = usernameToToggle;
             }
 
-            saveHiddenAccounts(hiddenAccounts);
-            // Re-render the feed using the globally available postData and current group filters
+            saveSelectedAccount(newSelection);
+            
+            // Re-run loadInstagramFeed(false) to re-render and re-create toggles 
+            // to update their visual state correctly.
             loadInstagramFeed(false); 
         });
 
@@ -183,19 +187,27 @@ function createAccountToggles(uniqueAccounts, hiddenAccounts) {
 /**
  * Filters the post data and generates the HTML to render the feed.
  * @param {Array<Object>} postData The full list of sorted posts (which includes group_name after loading).
- * @param {Set<string>} hiddenGroups Group IDs that should be hidden.
- * @param {Set<string>} hiddenAccounts Usernames that should be hidden.
+ * @param {Set<string>} hiddenGroups Group IDs that should be hidden (Inclusive/Exclusion).
+ * @param {string | null} selectedAccount The username of the exclusively selected account (Exclusive/Inclusion).
  */
-function applyFiltersAndRender(postData, hiddenGroups, hiddenAccounts) {
+function applyFiltersAndRender(postData, hiddenGroups, selectedAccount) {
     const feedContainer = document.getElementById('instagram-feed');
     feedContainer.innerHTML = '';
     
-    // 1. Filter the posts: MUST pass BOTH group AND account filter
+    // 1. Filter the posts:
     const visiblePosts = postData.filter(post => {
-        const passesGroupFilter = !hiddenGroups.has(post.group_id);
-        const passesAccountFilter = !hiddenAccounts.has(post.username);
-        
-        return passesGroupFilter && passesAccountFilter;
+        const isAccountSelected = selectedAccount !== null;
+
+        if (isAccountSelected) {
+            // EXCLUSIVE ACCOUNT FILTER: Only show posts from the selected account.
+            // All other filters (including group filters) are ignored when an account is exclusively selected.
+            return post.username === selectedAccount;
+        } else {
+            // INCLUSIVE GROUP FILTER: If no account is exclusively selected, filter by groups.
+            // Post is visible UNLESS its group ID is in the hidden list.
+            const passesGroupFilter = !hiddenGroups.has(post.group_id);
+            return passesGroupFilter;
+        }
     });
 
     if (visiblePosts.length === 0) {
@@ -326,17 +338,17 @@ async function loadInstagramFeed(initializeData = true) {
 
     // 5. Load filter preferences
     const hiddenGroups = loadHiddenGroups();
-    const hiddenAccounts = loadHiddenAccounts();
+    const selectedAccount = loadSelectedAccount();
     
     // 6. Create filter UI (only re-create the buttons if it's the initial data load)
-    if (initializeData) {
-        // Pass the collected unique group data
-        createGroupToggles(UNIQUE_GROUPS, hiddenGroups);
-        createAccountToggles(UNIQUE_ACCOUNTS, hiddenAccounts);
-    }
+    // The filter buttons must be re-created on every filter change (initializeData=false)
+    // to accurately reflect the active state of the buttons.
+    createGroupToggles(UNIQUE_GROUPS, hiddenGroups);
+    createAccountToggles(UNIQUE_ACCOUNTS, selectedAccount);
+
 
     // 7. Apply filters and render
-    applyFiltersAndRender(ALL_POST_DATA, hiddenGroups, hiddenAccounts);
+    applyFiltersAndRender(ALL_POST_DATA, hiddenGroups, selectedAccount);
 }
 
 // Run the function when the DOM is fully loaded
