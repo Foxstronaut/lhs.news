@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feed Data Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* CSS adapted to be cleaner and provide better layout for the tables */
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; color: #1f2937; padding: 20px; }
+        .card { background-color: #ffffff; border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding: 1.5rem; margin-bottom: 1.5rem; }
+        .input-group label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
+        .input-group input, .input-group select { width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; margin-bottom: 1rem; }
+        button { padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
+        .btn-primary { background-color: #4f46e5; color: white; }
+        .btn-primary:hover { background-color: #4338ca; }
+        .btn-danger { background-color: #ef4444; color: white; }
+        .btn-danger:hover { background-color: #dc2626; }
+        .btn-secondary { background-color: #f3f4f6; color: #1f2937; border: 1px solid #d1d5db; }
+        .error { color: #dc2626; font-weight: 600; margin-top: 0.5rem; }
+        #json-output { white-space: pre-wrap; word-wrap: break-word; font-family: monospace; background-color: #e5e7eb; padding: 1rem; border-radius: 0.375rem; height: 300px; }
+        
+        /* Table styles for better visual appeal */
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+        .data-table th, .data-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #e5e7eb; vertical-align: middle; }
+        .data-table th { background-color: #f9fafb; font-weight: 700; color: #4b5563; }
+        .data-table tr:hover { background-color: #f3f4f6; }
+        .editable-cell { cursor: pointer; display: block; }
+        .editable-cell:hover { background-color: #e0e7ff; }
+        .group-table-td { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    </style>
+</head>
+<body>
+
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">Feed Data Manager</h1>
+    <p class="mb-4 text-gray-600">Use this tool to add new groups and posts. Copy the resulting JSON below and paste it back into your <code class="bg-gray-200 p-1 rounded">feed_data.json</code> file.</p>
+
+    <!-- Group Management Card -->
+    <div class="card">
+        <h2 class="text-xl font-semibold mb-4 text-indigo-700">1. Add New Group</h2>
+        <!-- Simple text display removed, now using the full list below -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="input-group">
+                <label for="group-id-input">Group ID (e.g., 2)</label>
+                <input type="text" id="group-id-input" placeholder="e.g., 2">
+            </div>
+            <div class="input-group md:col-span-2">
+                <label for="group-name-input">Group Name (e.g., Travel Blogs)</label>
+                <input type="text" id="group-name-input" placeholder="e.g., Travel Blogs">
+            </div>
+        </div>
+        <button id="add-group-btn" class="btn-primary">Add Group</button>
+        <div id="group-error" class="error"></div>
+    </div>
+
+    <!-- Post Management Card -->
+    <div class="card">
+        <h2 class="text-xl font-semibold mb-4 text-indigo-700">2. Add New Post</h2>
+        <div class="input-group">
+            <label for="post-url-input">Instagram Post URL (Full Link)</label>
+            <input type="url" id="post-url-input" placeholder="e.g., https://www.instagram.com/user_name/p/ABCDEFGHIJ/">
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="input-group">
+                <label for="post-group-select">Select Group</label>
+                <select id="post-group-select"></select>
+            </div>
+            <div class="input-group">
+                <label for="post-order-id-input">Order ID (Next available: <span id="next-order-id" class="font-bold text-indigo-600">0000</span>)</label>
+                <input type="text" id="post-order-id-input" disabled>
+            </div>
+        </div>
+        <button id="add-post-btn" class="btn-primary">Add Post</button>
+        <div id="post-error" class="error"></div>
+        <div id="post-success" class="text-green-600 font-bold mt-2"></div>
+    </div>
+    
+    <!-- Current Data Display & Editing -->
+    <div class="card">
+        <h2 class="text-xl font-semibold mb-4 text-gray-800">3. Current Groups</h2>
+        <div id="group-list-container">
+            <p class="text-gray-500">Loading groups...</p>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2 class="text-xl font-semibold mb-4 text-gray-800">4. Current Posts</h2>
+        <div id="post-list-container">
+            <p class="text-gray-500">Loading posts...</p>
+        </div>
+    </div>
+
+    <!-- JSON Output -->
+    <div class="card">
+        <h2 class="text-xl font-semibold mb-4 text-gray-800">5. Updated JSON Output</h2>
+        <p class="mb-2 text-sm text-gray-700">Copy the text below and replace the content of your <code class="bg-gray-200 p-1 rounded">feed_data.json</code> file.</p>
+        <textarea id="json-output" class="w-full"></textarea>
+    </div>
+
+    <script>
+        let currentData = { groups: [], posts: [] };
+
+        /**
+         * Fetches data and initializes UI components.
+         */
+        async function loadData() {
+            try {
+                const response = await fetch('feed_data.json');
+                if (!response.ok) throw new Error('Could not fetch feed_data.json');
+                currentData = await response.json();
+                
+                if (!currentData.groups || !currentData.posts) {
+                    currentData = { groups: [], posts: [] };
+                    console.warn("JSON structure was incomplete. Resetting data structure.");
+                }
+
+                initializeUI();
+            } catch (error) {
+                document.getElementById('json-output').value = `Error loading data: ${error.message}`;
+                document.getElementById('group-list-container').innerHTML = `<p class="error">Error loading groups: ${error.message}</p>`;
+                document.getElementById('post-list-container').innerHTML = `<p class="error">Error loading posts: ${error.message}</p>`;
+                console.error("Initialization error:", error);
+            }
+        }
+
+        /**
+         * Populates initial UI elements and re-renders lists.
+         */
+        function initializeUI() {
+            // Sort posts and groups for consistent display
+            currentData.groups.sort((a, b) => a.id.localeCompare(b.id));
+            currentData.posts.sort((a, b) => a.order_id.localeCompare(b.order_id));
+            
+            populateGroupSelect();
+            updateNextOrderId();
+            renderCurrentGroups();
+            renderCurrentPosts();
+            renderJsonOutput();
+        }
+
+        // --- GROUP MANAGEMENT LOGIC ---
+
+        /**
+         * Renders the current groups into a list with delete buttons.
+         */
+        function renderCurrentGroups() {
+            const container = document.getElementById('group-list-container');
+            if (currentData.groups.length === 0) {
+                container.innerHTML = '<p class="text-gray-500">No groups defined yet. Please add a group in section 1.</p>';
+                return;
+            }
+
+            let html = '<table class="data-table"><thead><tr><th>ID</th><th>Name</th><th>Action</th></tr></thead><tbody>';
+            currentData.groups.forEach(group => {
+                const isUsed = currentData.posts.some(p => p.group_id === group.id);
+                const deleteBtnClass = isUsed ? 'btn-secondary opacity-50 cursor-not-allowed' : 'btn-danger';
+                const deleteBtnText = isUsed ? 'In Use' : 'Delete';
+                
+                html += `
+                    <tr>
+                        <td>${group.id}</td>
+                        <td>${group.name}</td>
+                        <td>
+                            <button class="${deleteBtnClass}" ${isUsed ? 'disabled' : ''} onclick="deleteGroup('${group.id}')">
+                                ${deleteBtnText}
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+        
+        /**
+         * Handles adding a new group definition.
+         */
+        document.getElementById('add-group-btn').addEventListener('click', () => {
+            const idInput = document.getElementById('group-id-input');
+            const nameInput = document.getElementById('group-name-input');
+            const errorDiv = document.getElementById('group-error');
+
+            const newId = idInput.value.trim();
+            const newName = nameInput.value.trim();
+            errorDiv.textContent = '';
+
+            if (!newId || !newName) {
+                errorDiv.textContent = 'Group ID and Name are required.';
+                return;
+            }
+            if (!/^\d+$/.test(newId)) {
+                errorDiv.textContent = 'Group ID must be a number (e.g., 2).';
+                return;
+            }
+            if (currentData.groups.some(g => g.id === newId)) {
+                errorDiv.textContent = `Group with ID '${newId}' already exists.`;
+                return;
+            }
+
+            currentData.groups.push({ id: newId, name: newName });
+            
+            // Clear inputs
+            idInput.value = '';
+            nameInput.value = '';
+            
+            // Re-initialize UI to update selectors and output
+            initializeUI(); 
+        });
+
+        /**
+         * Removes a group definition if it's not currently used by any post.
+         * @param {string} groupId The ID of the group to delete.
+         */
+        window.deleteGroup = (groupId) => {
+            const isUsed = currentData.posts.some(p => p.group_id === groupId);
+            
+            if (isUsed) {
+                document.getElementById('group-error').textContent = `Cannot delete Group ${groupId}. It is still referenced by one or more posts.`;
+                return;
+            }
+            
+            // Remove the group
+            currentData.groups = currentData.groups.filter(g => g.id !== groupId);
+            document.getElementById('group-error').textContent = '';
+            
+            // Re-render
+            initializeUI();
+        };
+
+        // --- POST MANAGEMENT LOGIC ---
+
+        /**
+         * Renders the current posts into a table with editing and delete features.
+         */
+        function renderCurrentPosts() {
+            const container = document.getElementById('post-list-container');
+            const groupMap = new Map(currentData.groups.map(g => [g.id, g.name]));
+            
+            if (currentData.posts.length === 0) {
+                container.innerHTML = '<p class="text-gray-500">No posts added yet. Use section 2 to add your first post.</p>';
+                return;
+            }
+
+            let html = '<div class="overflow-x-auto"><table class="data-table"><thead><tr><th>Order ID</th><th>User Name</th><th>Group</th><th class="group-table-td">URL</th><th>Action</th></tr></thead><tbody>';
+            currentData.posts.forEach(post => {
+                const groupName = groupMap.get(post.group_id) || 'Unknown';
+                
+                // Create a dropdown for inline group editing
+                let groupSelectHtml = `<select onchange="editPost('${post.order_id}', 'group_id', this.value)" class="p-1 border rounded text-sm w-32">`;
+                currentData.groups.forEach(group => {
+                    const selected = post.group_id === group.id ? 'selected' : '';
+                    groupSelectHtml += `<option value="${group.id}" ${selected}>${group.id}: ${group.name}</option>`;
+                });
+                groupSelectHtml += `</select>`;
+
+                html += `
+                    <tr>
+                        <td>
+                            <input type="text" value="${post.order_id}" onchange="editPost('${post.order_id}', 'order_id', this.value)" 
+                                class="p-1 border rounded w-16 text-center text-sm font-mono"/>
+                        </td>
+                        <td>@${post.username}</td>
+                        <td>${groupSelectHtml}</td>
+                        <td class="group-table-td">
+                            <a href="${post.url}" target="_blank" class="text-indigo-600 hover:text-indigo-800 underline">${post.url}</a>
+                        </td>
+                        <td>
+                            <button class="btn-danger p-1 text-xs" onclick="deletePost('${post.order_id}')">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        }
+
+        /**
+         * Removes a post from the data array.
+         * @param {string} orderId The order ID of the post to delete.
+         */
+        window.deletePost = (orderId) => {
+            currentData.posts = currentData.posts.filter(p => p.order_id !== orderId);
+            
+            // Re-render and update next ID
+            initializeUI();
+        };
+
+        /**
+         * Handles inline editing of post properties (group_id or order_id).
+         * @param {string} currentOrderId The original order ID (used to locate the post).
+         * @param {string} field The field being edited ('group_id' or 'order_id').
+         * @param {string} value The new value.
+         */
+        window.editPost = (currentOrderId, field, value) => {
+            const postIndex = currentData.posts.findIndex(p => p.order_id === currentOrderId);
+            if (postIndex === -1) return;
+
+            // Handle Order ID validation and uniqueness
+            if (field === 'order_id') {
+                const newValue = String(value).trim().padStart(4, '0');
+                if (currentData.posts.some((p, index) => p.order_id === newValue && index !== postIndex)) {
+                    document.getElementById('post-error').textContent = `Order ID ${newValue} is already in use. Please choose a unique ID.`;
+                    // Revert the input field visually (re-render)
+                    initializeUI();
+                    return;
+                }
+                
+                // Apply the change and re-sort
+                currentData.posts[postIndex][field] = newValue;
+                currentData.posts.sort((a, b) => a.order_id.localeCompare(b.order_id));
+                document.getElementById('post-error').textContent = '';
+
+            } else {
+                // Handle Group ID change (simple update)
+                currentData.posts[postIndex][field] = value;
+            }
+
+            // Re-render UI to update tables/selectors and JSON output
+            initializeUI();
+        };
+        
+        // --- UTILITY LOGIC (Updated to call initializeUI) ---
+        
+        /**
+         * Populates the group selection dropdown for new posts.
+         */
+        function populateGroupSelect() {
+            const select = document.getElementById('post-group-select');
+            select.innerHTML = '';
+            
+            if (currentData.groups.length === 0) {
+                 select.innerHTML = '<option value="">No groups defined</option>';
+                 document.getElementById('add-post-btn').disabled = true;
+                 return;
+            }
+            document.getElementById('add-post-btn').disabled = false;
+
+            // Add a default prompt option
+            select.innerHTML = '<option value="" disabled selected>-- Select Group --</option>';
+
+            // Sort groups for readability
+            currentData.groups.sort((a, b) => a.id.localeCompare(b.id)).forEach(group => {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = `Group ${group.id}: ${group.name}`;
+                select.appendChild(option);
+            });
+        }
+
+        /**
+         * Calculates and displays the next available 4-digit order ID.
+         */
+        function updateNextOrderId() {
+            const posts = currentData.posts;
+            if (posts.length === 0) {
+                document.getElementById('next-order-id').textContent = '0000';
+                document.getElementById('post-order-id-input').value = '0000';
+                return;
+            }
+            
+            // Ensure posts are sorted to find the correct max ID
+            posts.sort((a, b) => a.order_id.localeCompare(b.order_id));
+
+            // Get the maximum order_id, convert it to a number, increment, and format back to 4 digits
+            const maxId = posts.reduce((max, post) => Math.max(max, parseInt(post.order_id, 10)), -1);
+            const nextId = maxId >= 0 ? maxId + 1 : 0;
+            const formattedId = String(nextId).padStart(4, '0');
+
+            document.getElementById('next-order-id').textContent = formattedId;
+            document.getElementById('post-order-id-input').value = formattedId;
+        }
+
+        /**
+         * Renders the current JSON data to the output textarea.
+         */
+        function renderJsonOutput() {
+            const output = JSON.stringify(currentData, null, 2);
+            document.getElementById('json-output').value = output;
+        }
+
+
+        /**
+         * Parses a full Instagram URL to extract the username and canonical post URL.
+         * @param {string} fullUrl The full Instagram URL.
+         * @returns {{username: string, url: string, success: boolean}} 
+         */
+        function parseInstagramUrl(fullUrl) {
+            try {
+                const url = new URL(fullUrl);
+                const pathSegments = url.pathname.split('/').filter(p => p.length > 0);
+                
+                // Pattern 1: /username/p/post_id/
+                if (pathSegments.length >= 3 && pathSegments[1] === 'p') {
+                    // pathSegments[0] is the username
+                    const username = pathSegments[0];
+                    const postId = pathSegments[2];
+                    const canonicalUrl = `https://www.instagram.com/p/${postId}/`;
+                    return { username, url: canonicalUrl, success: true };
+                } 
+                
+                // Pattern 2: /p/post_id/ (short link, cannot extract username)
+                if (pathSegments.length >= 2 && pathSegments[0] === 'p') {
+                    // Use a placeholder username if it's the short link
+                    const postId = pathSegments[1];
+                    const canonicalUrl = `https://www.instagram.com/p/${postId}/`;
+                    return { username: 'unknown_user', url: canonicalUrl, success: true };
+                }
+
+            } catch (e) {
+                // If URL parsing fails
+            }
+            return { username: '', url: '', success: false };
+        }
+
+        /**
+         * Handles adding a new post.
+         */
+        document.getElementById('add-post-btn').addEventListener('click', () => {
+            const urlInput = document.getElementById('post-url-input');
+            const groupSelect = document.getElementById('post-group-select');
+            const orderIdInput = document.getElementById('post-order-id-input');
+            const errorDiv = document.getElementById('post-error');
+            const successDiv = document.getElementById('post-success');
+
+            const fullUrl = urlInput.value.trim();
+            const groupId = groupSelect.value;
+            const orderId = orderIdInput.value; // Taken from disabled input
+
+            errorDiv.textContent = '';
+            successDiv.textContent = '';
+
+            if (!fullUrl) {
+                errorDiv.textContent = 'Instagram URL is required.';
+                return;
+            }
+            if (!groupId) {
+                errorDiv.textContent = 'Please select a group.';
+                return;
+            }
+
+            const parsed = parseInstagramUrl(fullUrl);
+
+            if (!parsed.success || !parsed.url) {
+                errorDiv.textContent = 'Could not parse URL. Ensure the URL contains a post ID.';
+                return;
+            }
+            
+            if (currentData.posts.some(p => p.url === parsed.url)) {
+                 errorDiv.textContent = 'This post URL (canonical form) already exists in the data.';
+                 return;
+            }
+            
+            // Check against current order ID just in case the ID generator failed
+            if (currentData.posts.some(p => p.order_id === orderId)) {
+                 errorDiv.textContent = `Order ID ${orderId} is already in use. Please check the JSON or update manually.`;
+                 return;
+            }
+
+            const newPost = {
+                order_id: orderId,
+                username: parsed.username || 'unknown_user', // Fallback just in case
+                group_id: groupId,
+                url: parsed.url
+            };
+
+            currentData.posts.push(newPost);
+            
+            // Success message and clear
+            successDiv.textContent = `Post added for @${newPost.username} (Order ID: ${newPost.order_id}).`;
+            urlInput.value = '';
+            
+            // Re-initialize UI to update next order ID and output
+            initializeUI(); 
+        });
+
+        // Start loading data when the page loads
+        document.addEventListener('DOMContentLoaded', loadData);
+    </script>
+</body>
+</html>
