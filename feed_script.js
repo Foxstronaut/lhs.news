@@ -1,7 +1,7 @@
 // Function to fetch the JSON data and build the feed
 async function loadInstagramFeed() {
     const feedContainer = document.getElementById('instagram-feed');
-    feedContainer.innerHTML = '<div class="loading-message">Fetching data and building feed...</div>'; // Update loading message
+    feedContainer.innerHTML = '<div class="loading-message">Fetching data and building feed...</div>';
 
     try {
         // 1. Fetch the JSON data from the file
@@ -13,29 +13,24 @@ async function loadInstagramFeed() {
 
         const postData = await response.json();
 
-        // 2. Sort the posts based on the 'id' (priority) in descending order
-        const sortedPosts = postData.sort((a, b) => b.id - a.id);
-
+        // 2. The posts are now in the correct order, no sorting needed.
+        const sequentialPosts = postData; 
+        
         // 3. Clear the container before adding posts
         feedContainer.innerHTML = '';
 
-        // 4. Loop through sorted data and create HTML elements
-        sortedPosts.forEach(post => {
+        // 4. Loop through sequential data and create HTML elements
+        sequentialPosts.forEach((post, index) => {
             const postUrl = post.url;
-            const postId = post.id.toString();
-
-            // Extract the priority (first 6 digits) and account ID (last 4 digits)
-            const priority = postId.substring(0, 6);
-            const accountId = postId.substring(6);
-
-            // Create container and info elements
+            
+            // Create container and info elements (optional: showing the index)
             const container = document.createElement('div');
             container.classList.add('post-container');
 
             const infoDiv = document.createElement('div');
             infoDiv.classList.add('account-info');
             infoDiv.innerHTML = `
-                **Order Priority:** ${priority} | **Source Account ID:** ${accountId}
+                **Feed Order:** ${index + 1}
             `;
             container.appendChild(infoDiv);
 
@@ -44,7 +39,7 @@ async function loadInstagramFeed() {
             blockquote.classList.add('instagram-media');
             blockquote.setAttribute('data-instgrm-permalink', postUrl);
             blockquote.setAttribute('data-instgrm-version', '14');
-            // ... (keep the same inline styles for the blockquote)
+            // Inline styles for blockquote (required for proper display)
             blockquote.style.backgroundColor = '#FFF';
             blockquote.style.border = 0;
             blockquote.style.borderRadius = '3px';
@@ -69,11 +64,9 @@ async function loadInstagramFeed() {
         });
 
         // 5. Trigger Instagram's embed script to process the new blockquotes
-        // This is necessary because the content was added dynamically after page load.
         if (window.instgrm && window.instgrm.Embeds) {
             window.instgrm.Embeds.process();
         } else {
-            // Fallback for slower script loading
             window.addEventListener('load', () => {
                 if (window.instgrm && window.instgrm.Embeds) {
                     window.instgrm.Embeds.process();
@@ -83,7 +76,7 @@ async function loadInstagramFeed() {
 
     } catch (error) {
         console.error('Error loading the Instagram feed:', error);
-        feedContainer.innerHTML = `<div class="loading-message" style="color: red;">Error: Could not load feed data. Check console for details. (Tip: You may need to run this on a local server.)</div>`;
+        feedContainer.innerHTML = `<div class="loading-message" style="color: red;">Error: Could not load feed data. Check console for details.</div>`;
     }
 }
 
