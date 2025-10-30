@@ -140,7 +140,7 @@
         // --- GROUP MANAGEMENT LOGIC ---
 
         /**
-         * Renders the current groups into a list with delete buttons.
+         * Renders the current groups into a list with editing and delete buttons.
          */
         function renderCurrentGroups() {
             const container = document.getElementById('group-list-container');
@@ -148,6 +148,9 @@
                 container.innerHTML = '<p class="text-gray-500">No groups defined yet. Please add a group in section 1.</p>';
                 return;
             }
+
+            // Clear the group error message on refresh
+            document.getElementById('group-error').textContent = '';
 
             let html = '<table class="data-table"><thead><tr><th>ID</th><th>Name</th><th>Action</th></tr></thead><tbody>';
             currentData.groups.forEach(group => {
@@ -158,9 +161,13 @@
                 html += `
                     <tr>
                         <td>${group.id}</td>
-                        <td>${group.name}</td>
                         <td>
-                            <button class="${deleteBtnClass}" ${isUsed ? 'disabled' : ''} onclick="deleteGroup('${group.id}')">
+                            <!-- Editable input for Group Name -->
+                            <input type="text" value="${group.name}" onchange="editGroup('${group.id}', this.value)" 
+                                class="p-1 border rounded w-full text-sm"/>
+                        </td>
+                        <td>
+                            <button class="${deleteBtnClass} p-1 text-xs" ${isUsed ? 'disabled' : ''} onclick="deleteGroup('${group.id}')">
                                 ${deleteBtnText}
                             </button>
                         </td>
@@ -207,6 +214,31 @@
         });
 
         /**
+         * Handles inline editing of group properties (only name).
+         * @param {string} groupId The ID of the group to locate.
+         * @param {string} newName The new name value.
+         */
+        window.editGroup = (groupId, newName) => {
+            const trimmedName = newName.trim();
+            if (trimmedName === "") {
+                document.getElementById('group-error').textContent = 'Group name cannot be empty.';
+                initializeUI(); // Revert display
+                return;
+            }
+
+            const groupIndex = currentData.groups.findIndex(g => g.id === groupId);
+            if (groupIndex === -1) return;
+
+            // Apply the change
+            currentData.groups[groupIndex].name = trimmedName;
+
+            // Clear any old error message and re-render
+            document.getElementById('group-error').textContent = '';
+            initializeUI();
+        };
+
+
+        /**
          * Removes a group definition if it's not currently used by any post.
          * @param {string} groupId The ID of the group to delete.
          */
@@ -214,7 +246,7 @@
             const isUsed = currentData.posts.some(p => p.group_id === groupId);
             
             if (isUsed) {
-                document.getElementById('group-error').textContent = `Cannot delete Group ${groupId}. It is still referenced by one or more posts.`;
+                document.getElementById('group-error').textContent = `Cannot delete Group ${groupId}. It is still referenced by one or more posts. Please delete all posts in this group first.`;
                 return;
             }
             
