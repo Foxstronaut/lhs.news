@@ -64,14 +64,23 @@ async function loadInstagramFeed() {
         });
 
         // 5. Trigger Instagram's embed script to process the new blockquotes
-        if (window.instgrm && window.instgrm.Embeds) {
-            window.instgrm.Embeds.process();
-        } else {
-            window.addEventListener('load', () => {
+        // This function will wait until the entire page is loaded (guaranteeing 'window.instgrm' exists)
+        // and then apply a small delay to ensure the DOM is settled before processing embeds.
+        const processEmbedsWithDelay = () => {
+            setTimeout(() => {
                 if (window.instgrm && window.instgrm.Embeds) {
+                    console.log("Processing Instagram embeds after a short delay...");
                     window.instgrm.Embeds.process();
                 }
-            });
+            }, 500); // Wait 500ms (0.5 seconds)
+        };
+
+        // If the script is already loaded, process it now
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            processEmbedsWithDelay();
+        } else {
+            // Otherwise, wait for the page load event
+            window.addEventListener('load', processEmbedsWithDelay);
         }
 
     } catch (error) {
