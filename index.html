@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Instagram Feed</title>
+    <style>
+        /* CSS remains here (or move to a style.css file) */
+        body {
+            font-family: sans-serif;
+            background-color: #fafafa;
+            color: #262626;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        header {
+            margin-bottom: 30px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        #instagram-feed {
+            width: 100%;
+            max-width: 600px;
+        }
+        .post-container {
+            background-color: white;
+            border: 1px solid #dbdbdb;
+            border-radius: 3px;
+            margin-bottom: 20px;
+            padding: 10px;
+        }
+        .loading-message {
+            text-align: center;
+            padding: 50px;
+            font-style: italic;
+        }
+        .account-info {
+            font-size: 0.8em;
+            color: #8e8e8e;
+            margin-top: 5px;
+            margin-bottom: 10px;
+            border-bottom: 1px dashed #efefef;
+            padding-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>📸 Dynamic Instagram Feed</header>
+
+    <div id="instagram-feed">
+        <div class="loading-message">Loading feed...</div>
+    </div>
+
+    <script async src="//www.instagram.com/embed.js"></script>
+
+    <script src="feed_script.js"></script>
+
+</body>
+</html>
