@@ -1,26 +1,44 @@
-[
+{
+  "groups": [
+    { "id": "0", "name": "Photography" },
+    { "id": "1", "name": "Tech & Gaming" }
+  ],
+  "posts": [
     {
-        "id": "000001",
-        "url": "https://www.instagram.com/p/DHrDF2ryrKT/"
+      "order_id": "0001",
+      "url": "https://www.instagram.com/p/Cg3V0xFLB7r/",
+      "username": "natgeo",
+      "group_id": "0"
     },
     {
-        "id": "000101",
-        "url": "https://www.instagram.com/p/DPUi4PlgVJf/"
+      "order_id": "0002",
+      "url": "https://www.instagram.com/p/Ch1X3FnrX2O/",
+      "username": "nike",
+      "group_id": "0"
     },
     {
-        "id": "000201",
-        "url": "https://www.instagram.com/p/DOcO5Sbgb4P/"
+      "order_id": "0003",
+      "url": "https://www.instagram.com/p/CmUoD1zJb1c/",
+      "username": "tech_reviews",
+      "group_id": "1"
     },
     {
-        "id": "000302",
-        "url": "https://www.instagram.com/p/DQPc9ELkZle/"
+      "order_id": "0004",
+      "url": "https://www.instagram.com/p/Ch4O2_xrd8E/",
+      "username": "gaming_daily",
+      "group_id": "1"
     },
     {
-        "id": "000402",
-        "url": "https://www.instagram.com/p/DQF65ZVj19g/"
+      "order_id": "0005",
+      "url": "https://www.instagram.com/p/CmYk3Qxrb0o/",
+      "username": "natgeo",
+      "group_id": "0"
     },
     {
-        "id": "000502",
-        "url": "https://www.instagram.com/p/DQAkMH1gfA_/"
+      "order_id": "0006",
+      "url": "https://www.instagram.com/p/Ch3X3FnrX2O/",
+      "username": "tech_reviews",
+      "group_id": "1"
     }
-]
+  ]
+}
