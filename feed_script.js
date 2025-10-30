@@ -2,7 +2,7 @@
 const LOCAL_STORAGE_KEY_THEME = 'instagram_feed_theme';
 const LOCAL_STORAGE_KEY_FILTERS = 'instagram_feed_hidden_accounts';
 
-// --- DARK MODE LOGIC ---
+// --- DARK MODE LOGIC (Uses classes defined in the <style> block of index.html) ---
 
 /**
  * Sets up the dark mode toggle and loads the saved theme preference.
@@ -13,12 +13,21 @@ function setupDarkMode() {
 
     // 1. Load saved preference
     const savedTheme = localStorage.getItem(LOCAL_STORAGE_KEY_THEME);
-    let isDarkMode = savedTheme === 'dark';
+    let isDarkMode;
 
-    // Apply initial state
-    if (isDarkMode) {
+    if (savedTheme === 'light') {
+        isDarkMode = false;
+        body.classList.remove('dark-mode');
+        toggle.classList.remove('active');
+    } else {
+        // Default to dark mode if no preference is found (or if saved is 'dark')
+        isDarkMode = true;
         body.classList.add('dark-mode');
         toggle.classList.add('active');
+        // Ensure the initial state is explicitly saved as 'dark' if it was null
+        if (!savedTheme) {
+            localStorage.setItem(LOCAL_STORAGE_KEY_THEME, 'dark');
+        }
     }
 
     // 2. Setup click listener
@@ -49,13 +58,24 @@ function extractAccountId(id) {
 }
 
 /**
- * Loads the set of hidden account IDs from localStorage.
- * @returns {Set<string>} A Set of 2-digit account IDs that are currently hidden.
+ * Extracts the 1-digit account GROUP ID (first digit of the 2-digit account ID).
+ * This is used for filtering.
+ * @param {string} id The 6-digit ID string (e.g., "000001").
+ * @returns {string} The 1-digit account group ID (e.g., "0").
+ */
+function extractAccountGroup(id) {
+    const accountId = extractAccountId(id); // e.g., '01', '10'
+    return accountId.substring(0, 1); // e.g., '0', '1'
+}
+
+/**
+ * Loads the set of hidden account GROUP IDs from localStorage.
+ * @returns {Set<string>} A Set of 1-digit group IDs that are currently hidden.
  */
 function loadFilterPreferences() {
     const savedFilters = localStorage.getItem(LOCAL_STORAGE_KEY_FILTERS);
     if (savedFilters) {
-        // saved as a JSON string array, e.g., '["02"]'
+        // saved as a JSON string array, e.g., '["0"]'
         try {
             return new Set(JSON.parse(savedFilters));
         } catch (e) {
@@ -66,55 +86,56 @@ function loadFilterPreferences() {
 }
 
 /**
- * Saves the set of hidden account IDs to localStorage.
- * @param {Set<string>} hiddenAccounts The set of hidden account IDs.
+ * Saves the set of hidden account GROUP IDs to localStorage.
+ * @param {Set<string>} hiddenGroups The set of 1-digit group IDs.
  */
-function saveFilterPreferences(hiddenAccounts) {
-    localStorage.setItem(LOCAL_STORAGE_KEY_FILTERS, JSON.stringify(Array.from(hiddenAccounts)));
+function saveFilterPreferences(hiddenGroups) {
+    localStorage.setItem(LOCAL_STORAGE_KEY_FILTERS, JSON.stringify(Array.from(hiddenGroups)));
 }
 
 /**
- * Creates and attaches the filter toggle buttons to the DOM.
- * @param {Set<string>} uniqueAccounts All unique 2-digit account IDs found in the data.
- * @param {Set<string>} hiddenAccounts Account IDs currently marked as hidden.
+ * Creates and attaches the filter toggle buttons to the DOM for account groups.
+ * @param {Set<string>} uniqueGroups All unique 1-digit group IDs found in the data.
+ * @param {Set<string>} hiddenGroups Group IDs currently marked as hidden.
  * @param {Array<Object>} postData The full list of posts for re-rendering.
  */
-function createFilterToggles(uniqueAccounts, hiddenAccounts, postData) {
+function createFilterToggles(uniqueGroups, hiddenGroups, postData) {
     const controlBar = document.getElementById('filter-controls');
-    controlBar.innerHTML = '<span>Filter Accounts:</span>';
+    controlBar.innerHTML = '<span class="text-sm font-semibold">Filter Groups:</span>';
 
-    uniqueAccounts.forEach(accountId => {
+    uniqueGroups.forEach(groupId => {
         const button = document.createElement('button');
         
-        // Assign a more descriptive name based on account ID for the demo
-        let accountName = `Account ${accountId}`;
-        if (accountId === '01') accountName = 'Photography (01)';
-        if (accountId === '02') accountName = 'Sports (02)';
+        // Assign a more descriptive name based on group ID
+        let groupName = `Group ${groupId}x`;
+        if (groupId === '0') groupName = 'Group 0x (Photo, Sport)';
+        if (groupId === '1') groupName = 'Group 1x (Tech, Gaming)';
 
-        button.textContent = accountName;
-        button.setAttribute('data-account-id', accountId);
+        button.textContent = groupName;
+        button.setAttribute('data-group-id', groupId);
         
-        // Set initial state based on hiddenAccounts
-        const isActive = !hiddenAccounts.has(accountId);
+        // Set initial state based on hiddenGroups
+        const isActive = !hiddenGroups.has(groupId);
         if (isActive) {
             button.classList.add('active');
         }
 
         button.addEventListener('click', (e) => {
-            const id = e.target.getAttribute('data-account-id');
+            const id = e.target.getAttribute('data-group-id');
             const isActiveState = e.target.classList.contains('active');
             
             // Toggle the state and update localStorage
             if (isActiveState) {
-                hiddenAccounts.add(id);
+                hiddenGroups.add(id);
                 e.target.classList.remove('active');
             } else {
-                hiddenAccounts.delete(id);
+                hiddenGroups.delete(id);
                 e.target.classList.add('active');
             }
 
-            saveFilterPreferences(hiddenAccounts);
-            applyFiltersAndRender(postData, hiddenAccounts);
+            saveFilterPreferences(hiddenGroups);
+            // Rerender the feed with new filters
+            applyFiltersAndRender(postData, hiddenGroups);
         });
 
         controlBar.appendChild(button);
@@ -124,21 +145,21 @@ function createFilterToggles(uniqueAccounts, hiddenAccounts, postData) {
 /**
  * Filters the post data and generates the HTML to render the feed.
  * @param {Array<Object>} postData The full list of sorted posts.
- * @param {Set<string>} hiddenAccounts Account IDs that should be hidden.
+ * @param {Set<string>} hiddenGroups Group IDs that should be hidden.
  */
-function applyFiltersAndRender(postData, hiddenAccounts) {
+function applyFiltersAndRender(postData, hiddenGroups) {
     const feedContainer = document.getElementById('instagram-feed');
     feedContainer.innerHTML = '';
     
     // 1. Filter the posts
     const visiblePosts = postData.filter(post => {
-        const accountId = extractAccountId(post.id);
-        return !hiddenAccounts.has(accountId);
+        const groupId = extractAccountGroup(post.id);
+        return !hiddenGroups.has(groupId);
     });
 
     if (visiblePosts.length === 0) {
         feedContainer.innerHTML = '<div class="loading-message">No posts visible. Try enabling filters above.</div>';
-        // Need to run process() just in case, though unlikely to change anything
+        // Trigger process() just in case the loading message covers an existing embed
         if (window.instgrm && window.instgrm.Embeds) {
             window.instgrm.Embeds.process();
         }
@@ -150,6 +171,7 @@ function applyFiltersAndRender(postData, hiddenAccounts) {
     visiblePosts.forEach((post, index) => {
         const postUrl = post.url;
         const accountId = extractAccountId(post.id);
+        const groupId = extractAccountGroup(post.id);
         
         // Create container and info elements
         const container = document.createElement('div');
@@ -158,7 +180,7 @@ function applyFiltersAndRender(postData, hiddenAccounts) {
         const infoDiv = document.createElement('div');
         infoDiv.classList.add('account-info');
         infoDiv.innerHTML = `
-            <strong>ID:</strong> ${post.id} (Order: ${post.id.substring(0, 4)} | Account: ${accountId})
+            <strong>ID:</strong> ${post.id} (Order: ${post.id.substring(0, 4)} | Group: ${groupId} | Account: ${accountId})
         `;
         container.appendChild(infoDiv);
 
@@ -167,8 +189,8 @@ function applyFiltersAndRender(postData, hiddenAccounts) {
         blockquote.classList.add('instagram-media');
         blockquote.setAttribute('data-instgrm-permalink', postUrl);
         blockquote.setAttribute('data-instgrm-version', '14');
-        // Inline styles for blockquote (required for proper display, and cannot use CSS variables here)
-        blockquote.style.backgroundColor = '#FFF'; // Must be set to white for Instagram to work
+        // Instagram requires these inline styles for proper rendering
+        blockquote.style.backgroundColor = '#FFF';
         blockquote.style.border = '0';
         blockquote.style.borderRadius = '3px';
         blockquote.style.boxShadow = '0 0 1px 0 rgba(0,0,0,0.5),0 1px 10px 0 rgba(0,0,0,0.15)';
@@ -211,33 +233,33 @@ async function loadInstagramFeed() {
 
     try {
         // 1. Fetch and process the data
+        // NOTE: This assumes 'feed_data.json' is available in the same directory.
         const response = await fetch('feed_data.json');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         let postData = await response.json();
 
-        // 2. Sort the posts based on the first 4 digits of the ID (order)
+        // 2. Sort the posts based on the full 6-digit ID (order)
         postData.sort((a, b) => {
-            // Compare the full 6-digit ID strings lexicographically
-            // Since they are padded with '0', string comparison works for numerical sort.
+            // String comparison works due to consistent zero-padding
             return a.id.localeCompare(b.id);
         });
 
-        // 3. Identify all unique accounts for filter creation
-        const uniqueAccounts = new Set();
+        // 3. Identify all unique account GROUPS for filter creation (first digit of account ID)
+        const uniqueGroups = new Set();
         postData.forEach(post => {
-            uniqueAccounts.add(extractAccountId(post.id));
+            uniqueGroups.add(extractAccountGroup(post.id));
         });
 
         // 4. Load filter preferences
-        const hiddenAccounts = loadFilterPreferences();
+        const hiddenGroups = loadFilterPreferences();
         
         // 5. Create filter UI
-        createFilterToggles(uniqueAccounts, hiddenAccounts, postData);
+        createFilterToggles(uniqueGroups, hiddenGroups, postData);
 
         // 6. Initial render (apply filters)
-        applyFiltersAndRender(postData, hiddenAccounts);
+        applyFiltersAndRender(postData, hiddenGroups);
 
     } catch (error) {
         console.error('Error loading the Instagram feed:', error);
