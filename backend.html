@@ -64,9 +64,10 @@
                 <label for="post-group-select">Select Group</label>
                 <select id="post-group-select"></select>
             </div>
+            <!-- Order ID input is now editable to allow for manual placement -->
             <div class="input-group">
                 <label for="post-order-id-input">Order ID (Next available: <span id="next-order-id" class="font-bold text-indigo-600">0000</span>)</label>
-                <input type="text" id="post-order-id-input" disabled>
+                <input type="text" id="post-order-id-input" placeholder="0000">
             </div>
         </div>
         <button id="add-post-btn" class="btn-primary">Add Post</button>
@@ -287,8 +288,9 @@
                 html += `
                     <tr>
                         <td>
+                            <!-- Added maxlength for 4-digit ID -->
                             <input type="text" value="${post.order_id}" onchange="editPost('${post.order_id}', 'order_id', this.value)" 
-                                class="p-1 border rounded w-16 text-center text-sm font-mono"/>
+                                class="p-1 border rounded w-16 text-center text-sm font-mono" maxlength="4"/>
                         </td>
                         <td>@${post.username}</td>
                         <td>${groupSelectHtml}</td>
@@ -317,7 +319,7 @@
         };
 
         /**
-         * Handles inline editing of post properties (group_id or order_id).
+         * Handles inline editing of post properties (group_id or order_id) with bumping logic.
          * @param {string} currentOrderId The original order ID (used to locate the post).
          * @param {string} field The field being edited ('group_id' or 'order_id').
          * @param {string} value The new value.
@@ -326,20 +328,33 @@
             const postIndex = currentData.posts.findIndex(p => p.order_id === currentOrderId);
             if (postIndex === -1) return;
 
-            // Handle Order ID validation and uniqueness
+            // Handle Order ID validation and bumping
             if (field === 'order_id') {
                 const newValue = String(value).trim().padStart(4, '0');
-                if (currentData.posts.some((p, index) => p.order_id === newValue && index !== postIndex)) {
-                    document.getElementById('post-error').textContent = `Order ID ${newValue} is already in use. Please choose a unique ID.`;
-                    // Revert the input field visually (re-render)
-                    initializeUI();
+                
+                // 1. Basic format validation
+                if (!/^\d{4}$/.test(newValue)) {
+                    document.getElementById('post-error').textContent = 'Order ID must be a 4-digit number (e.g., 0005).';
+                    initializeUI(); // Revert display
                     return;
                 }
-                
-                // Apply the change and re-sort
-                currentData.posts[postIndex][field] = newValue;
-                currentData.posts.sort((a, b) => a.order_id.localeCompare(b.order_id));
+
                 document.getElementById('post-error').textContent = '';
+
+                // 2. Check for collision and bump existing posts (excluding the current one)
+                currentData.posts.forEach((post, index) => {
+                    // Only check other posts AND if their ID is the target ID or higher.
+                    if (index !== postIndex && post.order_id >= newValue) {
+                        const nextNum = parseInt(post.order_id, 10) + 1;
+                        post.order_id = String(nextNum).padStart(4, '0');
+                    }
+                });
+
+                // 3. Apply the change to the current post
+                currentData.posts[postIndex].order_id = newValue;
+                
+                // 4. Re-sort the whole array
+                currentData.posts.sort((a, b) => a.order_id.localeCompare(b.order_id));
 
             } else {
                 // Handle Group ID change (simple update)
@@ -444,7 +459,7 @@
         }
 
         /**
-         * Handles adding a new post.
+         * Handles adding a new post, including the order ID bumping logic.
          */
         document.getElementById('add-post-btn').addEventListener('click', () => {
             const urlInput = document.getElementById('post-url-input');
@@ -455,7 +470,8 @@
 
             const fullUrl = urlInput.value.trim();
             const groupId = groupSelect.value;
-            const orderId = orderIdInput.value; // Taken from disabled input
+            // Get the order ID, pad it, and ensure it's a string
+            let orderId = String(orderIdInput.value).trim().padStart(4, '0'); 
 
             errorDiv.textContent = '';
             successDiv.textContent = '';
@@ -480,15 +496,28 @@
                  errorDiv.textContent = 'This post URL (canonical form) already exists in the data.';
                  return;
             }
-            
-            // Check against current order ID just in case the ID generator failed
-            if (currentData.posts.some(p => p.order_id === orderId)) {
-                 errorDiv.textContent = `Order ID ${orderId} is already in use. Please check the JSON or update manually.`;
-                 return;
+
+            // 1. Validate that the orderId is a valid 4-digit string
+            if (!/^\d{4}$/.test(orderId)) {
+                errorDiv.textContent = 'Order ID must be a 4-digit number (e.g., 0005).';
+                return;
             }
 
+            // 2. Check for collision and bump existing posts
+            if (currentData.posts.some(p => p.order_id === orderId)) {
+                // Collision detected, bump all posts with an ID >= the target ID
+                currentData.posts.forEach(post => {
+                    // Lexicographical comparison works because IDs are 4-digit padded strings
+                    if (post.order_id >= orderId) {
+                        const nextNum = parseInt(post.order_id, 10) + 1;
+                        post.order_id = String(nextNum).padStart(4, '0');
+                    }
+                });
+            }
+
+
             const newPost = {
-                order_id: orderId,
+                order_id: orderId, // Use the user-specified/padded ID
                 username: parsed.username || 'unknown_user', // Fallback just in case
                 group_id: groupId,
                 url: parsed.url
