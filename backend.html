@@ -16,6 +16,7 @@
         .btn-danger { background-color: #ef4444; color: white; }
         .btn-danger:hover { background-color: #dc2626; }
         .btn-secondary { background-color: #f3f4f6; color: #1f2937; border: 1px solid #d1d5db; }
+        .btn-secondary:hover { background-color: #e5e7eb; }
         .error { color: #dc2626; font-weight: 600; margin-top: 0.5rem; }
         #json-output { white-space: pre-wrap; word-wrap: break-word; font-family: monospace; background-color: #e5e7eb; padding: 1rem; border-radius: 0.375rem; height: 300px; }
         
@@ -37,7 +38,6 @@
     <!-- Group Management Card -->
     <div class="card">
         <h2 class="text-xl font-semibold mb-4 text-indigo-700">1. Add New Group</h2>
-        <!-- Simple text display removed, now using the full list below -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="input-group">
                 <label for="group-id-input">Group ID (e.g., 2)</label>
@@ -59,15 +59,18 @@
             <label for="post-url-input">Instagram Post URL (Full Link)</label>
             <input type="url" id="post-url-input" placeholder="e.g., https://www.instagram.com/user_name/p/ABCDEFGHIJ/">
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="input-group">
+                <label for="post-date-input">Date Posted (YYYY-MM-DD)</label>
+                <input type="date" id="post-date-input" required>
+            </div>
             <div class="input-group">
                 <label for="post-group-select">Select Group</label>
                 <select id="post-group-select"></select>
             </div>
-            <!-- Order ID input is now editable to allow for manual placement -->
             <div class="input-group">
                 <label for="post-order-id-input">Order ID (Next available: <span id="next-order-id" class="font-bold text-indigo-600">0000</span>)</label>
-                <input type="text" id="post-order-id-input" placeholder="0000">
+                <input type="text" id="post-order-id-input" placeholder="0000" maxlength="4">
             </div>
         </div>
         <button id="add-post-btn" class="btn-primary">Add Post</button>
@@ -84,7 +87,7 @@
     </div>
     
     <div class="card">
-        <h2 class="text-xl font-semibold mb-4 text-gray-800">4. Current Posts</h2>
+        <h2 class="text-xl font-semibold mb-4 text-gray-800">4. Current Posts (Sorted by Date: Newest First)</h2>
         <div id="post-list-container">
             <p class="text-gray-500">Loading posts...</p>
         </div>
@@ -105,7 +108,8 @@
          */
         async function loadData() {
             try {
-                const response = await fetch('feed_data.json');
+                // IMPORTANT: The backend.html assumes the feed_data.json is available in the environment.
+                const response = await fetch('feed_data.json'); 
                 if (!response.ok) throw new Error('Could not fetch feed_data.json');
                 currentData = await response.json();
                 
@@ -127,10 +131,23 @@
          * Populates initial UI elements and re-renders lists.
          */
         function initializeUI() {
-            // Sort posts and groups for consistent display
+            // Sort groups
             currentData.groups.sort((a, b) => a.id.localeCompare(b.id));
-            currentData.posts.sort((a, b) => a.order_id.localeCompare(b.order_id));
             
+            // Primary sort is by date_posted (newest first), secondary is by order_id (ASC)
+            currentData.posts.sort((a, b) => {
+                // Ensure date_posted exists before comparison (use fallback date for missing data)
+                const dateA = a.date_posted || '0000-01-01';
+                const dateB = b.date_posted || '0000-01-01';
+
+                if (dateA !== dateB) {
+                    // Descending date sort (newest first)
+                    return dateB.localeCompare(dateA);
+                }
+                // Secondary sort by order_id (ascending) to maintain fine-grain control on same-day posts
+                return a.order_id.localeCompare(b.order_id);
+            });
+
             populateGroupSelect();
             updateNextOrderId();
             renderCurrentGroups();
@@ -273,9 +290,19 @@
                 return;
             }
 
-            let html = '<div class="overflow-x-auto"><table class="data-table"><thead><tr><th>Order ID</th><th>User Name</th><th>Group</th><th class="group-table-td">URL</th><th>Action</th></tr></thead><tbody>';
+            let html = '<div class="overflow-x-auto"><table class="data-table"><thead><tr><th>Date Posted (MM.DD.YYYY)</th><th>Order ID</th><th>User Name</th><th>Group</th><th class="group-table-td">URL</th><th>Action</th></tr></thead><tbody>';
             currentData.posts.forEach(post => {
                 const groupName = groupMap.get(post.group_id) || 'Unknown';
+                const displayDate = post.date_posted || '2000-01-01'; // Fallback date for sorting/input value
+                
+                // Convert YYYY-MM-DD (storage format) to MM.DD.YYYY (display format)
+                let formattedDate = 'N/A';
+                if (displayDate.length === 10) {
+                    const parts = displayDate.split('-'); // [YYYY, MM, DD]
+                    if (parts.length === 3) {
+                        formattedDate = `${parts[1]}.${parts[2]}.${parts[0]}`; // MM.DD.YYYY
+                    }
+                }
                 
                 // Create a dropdown for inline group editing
                 let groupSelectHtml = `<select onchange="editPost('${post.order_id}', 'group_id', this.value)" class="p-1 border rounded text-sm w-32">`;
@@ -287,6 +314,16 @@
 
                 html += `
                     <tr>
+                        <td class="relative">
+                            <!-- Display the requested MM.DD.YYYY format -->
+                            <span class="text-sm font-mono cursor-pointer hover:bg-indigo-100 p-1 rounded inline-block" 
+                                onclick="this.nextElementSibling.focus()">
+                                ${formattedDate}
+                            </span>
+                            <!-- Hidden date input for functionality (holds YYYY-MM-DD value and triggers date picker) -->
+                            <input type="date" value="${displayDate}" onchange="editPost('${post.order_id}', 'date_posted', this.value)" 
+                                class="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"/>
+                        </td>
                         <td>
                             <!-- Added maxlength for 4-digit ID -->
                             <input type="text" value="${post.order_id}" onchange="editPost('${post.order_id}', 'order_id', this.value)" 
@@ -319,17 +356,28 @@
         };
 
         /**
-         * Handles inline editing of post properties (group_id or order_id) with bumping logic.
+         * Handles inline editing of post properties.
          * @param {string} currentOrderId The original order ID (used to locate the post).
-         * @param {string} field The field being edited ('group_id' or 'order_id').
+         * @param {string} field The field being edited ('group_id', 'order_id', or 'date_posted').
          * @param {string} value The new value.
          */
         window.editPost = (currentOrderId, field, value) => {
             const postIndex = currentData.posts.findIndex(p => p.order_id === currentOrderId);
             if (postIndex === -1) return;
 
-            // Handle Order ID validation and bumping
-            if (field === 'order_id') {
+            document.getElementById('post-error').textContent = '';
+
+            if (field === 'date_posted') {
+                const trimmedValue = value.trim();
+                // We keep the internal storage format as YYYY-MM-DD for correct sorting
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmedValue)) {
+                    document.getElementById('post-error').textContent = 'Invalid date format. Date must be YYYY-MM-DD internally.';
+                    initializeUI(); 
+                    return;
+                }
+                currentData.posts[postIndex][field] = trimmedValue;
+
+            } else if (field === 'order_id') {
                 const newValue = String(value).trim().padStart(4, '0');
                 
                 // 1. Basic format validation
@@ -339,12 +387,10 @@
                     return;
                 }
 
-                document.getElementById('post-error').textContent = '';
-
                 // 2. Check for collision and bump existing posts (excluding the current one)
                 currentData.posts.forEach((post, index) => {
-                    // Only check other posts AND if their ID is the target ID or higher.
-                    if (index !== postIndex && post.order_id >= newValue) {
+                    // Only check other posts AND if their ID is the target ID or higher AND the date matches
+                    if (index !== postIndex && post.order_id >= newValue && post.date_posted === currentData.posts[postIndex].date_posted) {
                         const nextNum = parseInt(post.order_id, 10) + 1;
                         post.order_id = String(nextNum).padStart(4, '0');
                     }
@@ -353,9 +399,6 @@
                 // 3. Apply the change to the current post
                 currentData.posts[postIndex].order_id = newValue;
                 
-                // 4. Re-sort the whole array
-                currentData.posts.sort((a, b) => a.order_id.localeCompare(b.order_id));
-
             } else {
                 // Handle Group ID change (simple update)
                 currentData.posts[postIndex][field] = value;
@@ -365,7 +408,7 @@
             initializeUI();
         };
         
-        // --- UTILITY LOGIC (Updated to call initializeUI) ---
+        // --- UTILITY LOGIC ---
         
         /**
          * Populates the group selection dropdown for new posts.
@@ -404,10 +447,7 @@
                 return;
             }
             
-            // Ensure posts are sorted to find the correct max ID
-            posts.sort((a, b) => a.order_id.localeCompare(b.order_id));
-
-            // Get the maximum order_id, convert it to a number, increment, and format back to 4 digits
+            // Get the maximum order_id from the *current* list
             const maxId = posts.reduce((max, post) => Math.max(max, parseInt(post.order_id, 10)), -1);
             const nextId = maxId >= 0 ? maxId + 1 : 0;
             const formattedId = String(nextId).padStart(4, '0');
@@ -437,7 +477,6 @@
                 
                 // Pattern 1: /username/p/post_id/
                 if (pathSegments.length >= 3 && pathSegments[1] === 'p') {
-                    // pathSegments[0] is the username
                     const username = pathSegments[0];
                     const postId = pathSegments[2];
                     const canonicalUrl = `https://www.instagram.com/p/${postId}/`;
@@ -446,7 +485,6 @@
                 
                 // Pattern 2: /p/post_id/ (short link, cannot extract username)
                 if (pathSegments.length >= 2 && pathSegments[0] === 'p') {
-                    // Use a placeholder username if it's the short link
                     const postId = pathSegments[1];
                     const canonicalUrl = `https://www.instagram.com/p/${postId}/`;
                     return { username: 'unknown_user', url: canonicalUrl, success: true };
@@ -465,11 +503,15 @@
             const urlInput = document.getElementById('post-url-input');
             const groupSelect = document.getElementById('post-group-select');
             const orderIdInput = document.getElementById('post-order-id-input');
+            const dateInput = document.getElementById('post-date-input');
+            
             const errorDiv = document.getElementById('post-error');
             const successDiv = document.getElementById('post-success');
 
             const fullUrl = urlInput.value.trim();
             const groupId = groupSelect.value;
+            const postDate = dateInput.value.trim(); 
+            
             // Get the order ID, pad it, and ensure it's a string
             let orderId = String(orderIdInput.value).trim().padStart(4, '0'); 
 
@@ -482,6 +524,10 @@
             }
             if (!groupId) {
                 errorDiv.textContent = 'Please select a group.';
+                return;
+            }
+            if (!postDate) { 
+                errorDiv.textContent = 'Post Date is required.';
                 return;
             }
 
@@ -504,11 +550,10 @@
             }
 
             // 2. Check for collision and bump existing posts
-            if (currentData.posts.some(p => p.order_id === orderId)) {
-                // Collision detected, bump all posts with an ID >= the target ID
+            if (currentData.posts.some(p => p.order_id === orderId && p.date_posted === postDate)) {
+                // Collision detected only if ID AND Date match. Bump all posts with matching date and ID >= the target ID
                 currentData.posts.forEach(post => {
-                    // Lexicographical comparison works because IDs are 4-digit padded strings
-                    if (post.order_id >= orderId) {
+                    if (post.date_posted === postDate && post.order_id >= orderId) {
                         const nextNum = parseInt(post.order_id, 10) + 1;
                         post.order_id = String(nextNum).padStart(4, '0');
                     }
@@ -520,7 +565,8 @@
                 order_id: orderId, // Use the user-specified/padded ID
                 username: parsed.username || 'unknown_user', // Fallback just in case
                 group_id: groupId,
-                url: parsed.url
+                url: parsed.url,
+                date_posted: postDate // NEW FIELD
             };
 
             currentData.posts.push(newPost);
@@ -528,6 +574,7 @@
             // Success message and clear
             successDiv.textContent = `Post added for @${newPost.username} (Order ID: ${newPost.order_id}).`;
             urlInput.value = '';
+            dateInput.value = ''; // Clear date input
             
             // Re-initialize UI to update next order ID and output
             initializeUI(); 
