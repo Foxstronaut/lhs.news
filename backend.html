@@ -5,554 +5,528 @@
     <title>Feed Data Management</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* CSS adapted to be cleaner and provide better layout for the tables */
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; color: #1f2937; padding: 20px; }
-        .card { background-color: #ffffff; border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); padding: 1.5rem; margin-bottom: 1.5rem; }
-        .input-group label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
-        .input-group input, .input-group select { width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; margin-bottom: 1rem; }
-        button { padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
-        .btn-primary { background-color: #4f46e5; color: white; }
-        .btn-primary:hover { background-color: #4338ca; }
-        .btn-danger { background-color: #ef4444; color: white; }
-        .btn-danger:hover { background-color: #dc2626; }
-        .btn-secondary { background-color: #f3f4f6; color: #1f2937; border: 1px solid #d1d5db; }
-        .btn-secondary:hover { background-color: #e5e7eb; }
-        .error { color: #dc2626; font-weight: 600; margin-top: 0.5rem; }
-        #json-output { white-space: pre-wrap; word-wrap: break-word; font-family: monospace; background-color: #e5e7eb; padding: 1rem; border-radius: 0.375rem; height: 300px; }
+        /* Base styles using Inter font and CSS Variables for theming */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+        /* --- LIGHT MODE VARIABLES (Default) --- */
+        :root {
+            --bg-color: #f3f4f6;
+            --text-color: #1f2937;
+            --card-bg: #ffffff;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+            --border-color: #d1d5db;
+            --accent-color: #4f46e5;
+            --success-color: #10b981; /* green-500 */
+            --error-color: #ef4444;   /* red-500 */
+        }
+
+        /* --- DARK MODE VARIABLES --- */
+        .dark-mode {
+            --bg-color: #111827;
+            --text-color: #f3f4f6;
+            --card-bg: #1f2937;
+            --shadow-color: rgba(255, 255, 255, 0.1);
+            --border-color: #4b5563;
+            --accent-color: #a5b4fc;
+            --success-color: #34d399;
+            --error-color: #f87171;
+        }
+
+        /* --- GLOBAL STYLES --- */
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--bg-color); 
+            color: var(--text-color); 
+            padding: 20px; 
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .card { 
+            background-color: var(--card-bg); 
+            border-radius: 0.5rem; 
+            box-shadow: 0 4px 6px -1px var(--shadow-color); 
+            padding: 1.5rem; 
+            margin-bottom: 1.5rem;
+            transition: background-color 0.3s, box-shadow 0.3s;
+        }
         
-        /* Table styles for better visual appeal */
-        .data-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-        .data-table th, .data-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #e5e7eb; vertical-align: middle; }
-        .data-table th { background-color: #f9fafb; font-weight: 700; color: #4b5563; }
-        .data-table tr:hover { background-color: #f3f4f6; }
-        .editable-cell { cursor: pointer; display: block; }
-        .editable-cell:hover { background-color: #e0e7ff; }
-        .group-table-td { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* --- INPUT STYLES --- */
+        .input-group label { 
+            display: block; 
+            font-weight: 600; 
+            margin-bottom: 0.25rem; 
+        }
+        .input-group input, .input-group select { 
+            width: 100%; 
+            padding: 0.5rem; 
+            border: 1px solid var(--border-color); 
+            border-radius: 0.375rem; 
+            margin-bottom: 1rem;
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            transition: border-color 0.3s, background-color 0.3s;
+        }
+
+        /* --- BUTTON STYLES --- */
+        button { 
+            padding: 0.5rem 1rem; 
+            border-radius: 0.375rem; 
+            font-weight: 600; 
+            cursor: pointer; 
+            transition: background-color 0.2s, opacity 0.2s; 
+        }
+        .btn-primary { 
+            background-color: var(--accent-color); 
+            color: var(--card-bg); /* Ensure button text is visible against accent color */
+        }
+        .btn-primary:hover { 
+            opacity: 0.9; 
+        }
+
+        /* --- TABLE STYLES --- */
+        .table-auto { width: 100%; border-collapse: collapse; }
+        .table-auto th { 
+            padding: 0.75rem; 
+            text-align: left; 
+            border-bottom: 2px solid var(--border-color); 
+            font-size: 0.875rem; 
+            font-weight: 600; 
+        }
+        .table-auto td { 
+            padding: 0.75rem; 
+            border-bottom: 1px solid var(--border-color); 
+            font-size: 0.875rem; 
+        }
+        /* Style for Action buttons in the table */
+        .action-button {
+            padding: 0.25rem 0.5rem;
+            margin-right: 0.5rem;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+        .action-button:hover {
+            opacity: 0.7;
+        }
+
+        /* --- MESSAGE STYLES --- */
+        .message-success { color: var(--success-color); }
+        .message-error { color: var(--error-color); }
+
+
+        /* --- DARK MODE TOGGLE STYLES --- */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toggle-switch {
+            width: 48px;
+            height: 24px;
+            background-color: var(--border-color);
+            border-radius: 12px;
+            position: relative;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .toggle-switch::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background-color: var(--card-bg); 
+            border-radius: 50%;
+            transition: transform 0.3s;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        .toggle-switch.active {
+            background-color: var(--accent-color);
+        }
+
+        .toggle-switch.active::before {
+            transform: translateX(24px);
+        }
     </style>
 </head>
 <body>
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">Feed Data Management</h1>
+        <!-- Dark Mode Toggle -->
+        <div class="toggle-container">
+            <span class="text-xl">☀️</span>
+            <div id="dark-mode-toggle" class="toggle-switch"></div>
+            <span class="text-xl">🌙</span>
+        </div>
+    </div>
+    
+    <div class="card max-w-4xl mx-auto">
+        <h2 class="text-2xl font-semibold mb-4 border-b pb-2">Add New Post</h2>
+        <div id="error-message" class="mb-4 font-semibold"></div>
+        <div id="success-message" class="mb-4 font-semibold"></div>
 
-    <h1 class="text-3xl font-bold text-gray-800 mb-6">Feed Data Manager</h1>
-    <p class="mb-4 text-gray-600">Use this tool to add new groups and posts. Copy the resulting JSON below and paste it back into your <code class="bg-gray-200 p-1 rounded">feed_data.json</code> file.</p>
-
-    <!-- Group Management Card -->
-    <div class="card">
-        <h2 class="text-xl font-semibold mb-4 text-indigo-700">1. Add New Group</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Order ID -->
             <div class="input-group">
-                <label for="group-id-input">Group ID (e.g., 2)</label>
-                <input type="text" id="group-id-input" placeholder="e.g., 2">
+                <label for="order-id">Order ID (4 digits)</label>
+                <input type="text" id="order-id" placeholder="e.g., 0005" maxlength="4">
+                <p id="next-order-id-hint" class="text-xs text-gray-500 mt-[-0.75rem]">Next available: 0000</p>
             </div>
-            <div class="input-group md:col-span-2">
-                <label for="group-name-input">Group Name (e.g., Travel Blogs)</label>
-                <input type="text" id="group-name-input" placeholder="e.g., Travel Blogs">
+            
+            <!-- Date Posted (NEW INPUT) -->
+            <div class="input-group">
+                <label for="date-posted">Date Posted</label>
+                <input type="date" id="date-posted" required>
+            </div>
+
+            <!-- Group ID -->
+            <div class="input-group">
+                <label for="group-id">Group</label>
+                <select id="group-id">
+                    <!-- Options populated by JS -->
+                </select>
             </div>
         </div>
-        <button id="add-group-btn" class="btn-primary">Add Group</button>
-        <div id="group-error" class="error"></div>
-    </div>
 
-    <!-- Post Management Card -->
-    <div class="card">
-        <h2 class="text-xl font-semibold mb-4 text-indigo-700">2. Add New Post</h2>
+        <!-- Instagram URL -->
         <div class="input-group">
-            <label for="post-url-input">Instagram Post URL (Full Link)</label>
-            <input type="url" id="post-url-input" placeholder="e.g., https://www.instagram.com/user_name/p/ABCDEFGHIJ/">
+            <label for="instagram-url">Instagram Post URL</label>
+            <input type="text" id="instagram-url" placeholder="e.g., https://www.instagram.com/p/B9-Zq0-Fp-X/" required>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="input-group">
-                <label for="post-date-input">Date Posted (YYYY-MM-DD)</label>
-                <input type="date" id="post-date-input" required>
-            </div>
-            <div class="input-group">
-                <label for="post-group-select">Select Group</label>
-                <select id="post-group-select"></select>
-            </div>
-            <div class="input-group">
-                <label for="post-order-id-input">Order ID (Next available: <span id="next-order-id" class="font-bold text-indigo-600">0000</span>)</label>
-                <input type="text" id="post-order-id-input" placeholder="0000" maxlength="4">
-            </div>
-        </div>
-        <button id="add-post-btn" class="btn-primary">Add Post</button>
-        <div id="post-error" class="error"></div>
-        <div id="post-success" class="text-green-600 font-bold mt-2"></div>
-    </div>
-    
-    <!-- Current Data Display & Editing -->
-    <div class="card">
-        <h2 class="text-xl font-semibold mb-4 text-gray-800">3. Current Groups</h2>
-        <div id="group-list-container">
-            <p class="text-gray-500">Loading groups...</p>
-        </div>
-    </div>
-    
-    <div class="card">
-        <h2 class="text-xl font-semibold mb-4 text-gray-800">4. Current Posts (Sorted by Date: Newest First)</h2>
-        <div id="post-list-container">
-            <p class="text-gray-500">Loading posts...</p>
-        </div>
+
+        <button id="add-post-button" class="btn-primary w-full">Add Post</button>
     </div>
 
-    <!-- JSON Output -->
-    <div class="card">
-        <h2 class="text-xl font-semibold mb-4 text-gray-800">5. Updated JSON Output</h2>
-        <p class="mb-2 text-sm text-gray-700">Copy the text below and replace the content of your <code class="bg-gray-200 p-1 rounded">feed_data.json</code> file.</p>
-        <textarea id="json-output" class="w-full"></textarea>
+    <div class="card max-w-6xl mx-auto">
+        <h2 class="text-2xl font-semibold mb-4 border-b pb-2">Current Posts</h2>
+        <div class="overflow-x-auto">
+            <table id="posts-table" class="table-auto">
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Date</th>
+                        <th>Username</th>
+                        <th>Group</th>
+                        <th>URL</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Posts will be populated by JS -->
+                </tbody>
+            </table>
+        </div>
+        <div class="flex justify-end mt-4">
+            <button id="save-data-button" class="btn-primary">Save Changes to JSON</button>
+        </div>
+        
+        <div id="save-message" class="mt-4 font-semibold text-center"></div>
     </div>
 
     <script>
-        let currentData = { groups: [], posts: [] };
+        const LOCAL_STORAGE_KEY_THEME = 'backend_theme';
+        const urlInput = document.getElementById('instagram-url');
+        const orderIdInput = document.getElementById('order-id');
+        const dateInput = document.getElementById('date-posted'); // New
+        const groupIdSelect = document.getElementById('group-id');
+        const hint = document.getElementById('next-order-id-hint');
+        const addPostButton = document.getElementById('add-post-button');
+        const saveButton = document.getElementById('save-data-button');
+        const postsTableBody = document.querySelector('#posts-table tbody');
+        const errorDiv = document.getElementById('error-message');
+        const successDiv = document.getElementById('success-message');
+        const saveMessageDiv = document.getElementById('save-message');
+        const backendContainer = document.querySelector('body');
+
+        let feedData = { groups: [], posts: [] };
+        
+        // --- DARK MODE LOGIC ---
+        
+        /**
+         * Sets up the dark mode toggle and loads the saved theme preference.
+         */
+        function setupDarkMode() {
+            const body = document.body;
+            const toggle = document.getElementById('dark-mode-toggle');
+
+            const savedTheme = localStorage.getItem(LOCAL_STORAGE_KEY_THEME);
+            // Default to dark mode if not set
+            let isDarkMode = (savedTheme === 'dark' || !savedTheme);
+            
+            // Apply initial state
+            body.classList.toggle('dark-mode', isDarkMode);
+            toggle.classList.toggle('active', isDarkMode);
+            
+            if (!savedTheme) {
+                localStorage.setItem(LOCAL_STORAGE_KEY_THEME, isDarkMode ? 'dark' : 'light');
+            }
+
+            // Setup click listener
+            toggle.addEventListener('click', () => {
+                isDarkMode = !isDarkMode;
+                body.classList.toggle('dark-mode', isDarkMode);
+                toggle.classList.toggle('active', isDarkMode);
+                
+                // Save new preference
+                localStorage.setItem(LOCAL_STORAGE_KEY_THEME, isDarkMode ? 'dark' : 'light');
+            });
+        }
+        
+        // --- DATA MANAGEMENT LOGIC ---
 
         /**
-         * Fetches data and initializes UI components.
+         * Loads the data from the 'feed_data.json' file.
          */
         async function loadData() {
             try {
-                // IMPORTANT: The backend.html assumes the feed_data.json is available in the environment.
-                const response = await fetch('feed_data.json'); 
-                if (!response.ok) throw new Error('Could not fetch feed_data.json');
-                currentData = await response.json();
+                // Use fetch to read the file content
+                const response = await fetch('feed_data.json');
+                if (!response.ok) throw new Error('Failed to load feed_data.json');
+                feedData = await response.json();
                 
-                if (!currentData.groups || !currentData.posts) {
-                    currentData = { groups: [], posts: [] };
-                    console.warn("JSON structure was incomplete. Resetting data structure.");
-                }
+                // Ensure data structure is initialized if file was empty/malformed
+                feedData.groups = feedData.groups || [];
+                feedData.posts = feedData.posts || [];
 
                 initializeUI();
             } catch (error) {
-                document.getElementById('json-output').value = `Error loading data: ${error.message}`;
-                document.getElementById('group-list-container').innerHTML = `<p class="error">Error loading groups: ${error.message}</p>`;
-                document.getElementById('post-list-container').innerHTML = `<p class="error">Error loading posts: ${error.message}</p>`;
-                console.error("Initialization error:", error);
+                console.error('Error loading or parsing feed_data.json:', error);
+                // Initialize with empty arrays on error
+                feedData = { groups: [], posts: [] };
+                initializeUI();
             }
         }
 
         /**
-         * Populates initial UI elements and re-renders lists.
+         * Saves the current feedData object back to 'feed_data.json'.
          */
-        function initializeUI() {
-            // Sort groups
-            currentData.groups.sort((a, b) => a.id.localeCompare(b.id));
+        async function saveData() {
+            try {
+                // IMPORTANT: In the Canvas environment, writing to a file is done by 
+                // setting the global __file_contents object and setting the appropriate
+                // mime type.
+                const newContent = JSON.stringify(feedData, null, 2);
+                
+                if (typeof __file_contents !== 'undefined') {
+                    __file_contents['feed_data.json'] = {
+                        content: newContent,
+                        mimeType: 'application/json'
+                    };
+                }
+                
+                saveMessageDiv.textContent = 'Changes saved successfully!';
+                saveMessageDiv.classList.remove('message-error');
+                saveMessageDiv.classList.add('message-success');
+            } catch (error) {
+                console.error('Error saving data:', error);
+                saveMessageDiv.textContent = 'Error saving changes.';
+                saveMessageDiv.classList.remove('message-success');
+                saveMessageDiv.classList.add('message-error');
+            }
+            // Clear message after a delay
+            setTimeout(() => {
+                saveMessageDiv.textContent = '';
+                saveMessageDiv.classList.remove('message-success', 'message-error');
+            }, 3000);
+        }
+
+        /**
+         * Gets the next available order ID by finding the maximum existing ID.
+         * @returns {string} The next 4-digit order ID.
+         */
+        function getNextOrderId() {
+            const maxId = feedData.posts.reduce((max, post) => {
+                const currentId = parseInt(post.order_id, 10);
+                return currentId > max ? currentId : max;
+            }, -1);
             
-            // Primary sort is by date_posted (newest first), secondary is by order_id (ASC)
-            currentData.posts.sort((a, b) => {
-                // Ensure date_posted exists before comparison (use fallback date for missing data)
+            const nextId = maxId + 1;
+            return String(nextId).padStart(4, '0');
+        }
+
+        /**
+         * Populates the Group ID dropdown.
+         */
+        function populateGroupSelect() {
+            groupIdSelect.innerHTML = ''; // Clear previous options
+            feedData.groups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = `${group.name} (${group.id})`;
+                groupIdSelect.appendChild(option);
+            });
+        }
+
+        /**
+         * Renders the current list of posts into the table.
+         */
+        function renderPostsTable() {
+            postsTableBody.innerHTML = ''; // Clear table body
+            
+            // Sort by Date Posted (Newest first), then Order ID (Ascending)
+            const sortedPosts = [...feedData.posts].sort((a, b) => {
                 const dateA = a.date_posted || '0000-01-01';
                 const dateB = b.date_posted || '0000-01-01';
 
+                // Primary sort: Date Descending (Newest first)
                 if (dateA !== dateB) {
-                    // Descending date sort (newest first)
                     return dateB.localeCompare(dateA);
                 }
-                // Secondary sort by order_id (ascending) to maintain fine-grain control on same-day posts
+                // Secondary sort: Order ID Ascending
                 return a.order_id.localeCompare(b.order_id);
             });
+            
+            const groupMap = new Map(feedData.groups.map(g => [g.id, g.name]));
 
-            populateGroupSelect();
-            updateNextOrderId();
-            renderCurrentGroups();
-            renderCurrentPosts();
-            renderJsonOutput();
-        }
-
-        // --- GROUP MANAGEMENT LOGIC ---
-
-        /**
-         * Renders the current groups into a list with editing and delete buttons.
-         */
-        function renderCurrentGroups() {
-            const container = document.getElementById('group-list-container');
-            if (currentData.groups.length === 0) {
-                container.innerHTML = '<p class="text-gray-500">No groups defined yet. Please add a group in section 1.</p>';
-                return;
-            }
-
-            // Clear the group error message on refresh
-            document.getElementById('group-error').textContent = '';
-
-            let html = '<table class="data-table"><thead><tr><th>ID</th><th>Name</th><th>Action</th></tr></thead><tbody>';
-            currentData.groups.forEach(group => {
-                const isUsed = currentData.posts.some(p => p.group_id === group.id);
-                const deleteBtnClass = isUsed ? 'btn-secondary opacity-50 cursor-not-allowed' : 'btn-danger';
-                const deleteBtnText = isUsed ? 'In Use' : 'Delete';
+            sortedPosts.forEach(post => {
+                const row = postsTableBody.insertRow();
+                const groupName = groupMap.get(post.group_id) || `Unknown Group (${post.group_id})`;
                 
-                html += `
-                    <tr>
-                        <td>${group.id}</td>
-                        <td>
-                            <!-- Editable input for Group Name -->
-                            <input type="text" value="${group.name}" onchange="editGroup('${group.id}', this.value)" 
-                                class="p-1 border rounded w-full text-sm"/>
-                        </td>
-                        <td>
-                            <button class="${deleteBtnClass} p-1 text-xs" ${isUsed ? 'disabled' : ''} onclick="deleteGroup('${group.id}')">
-                                ${deleteBtnText}
-                            </button>
-                        </td>
-                    </tr>
-                `;
+                row.insertCell().textContent = post.order_id;
+                row.insertCell().textContent = post.date_posted || 'N/A'; // Display the new date field
+                row.insertCell().textContent = post.username;
+                row.insertCell().textContent = groupName;
+                
+                const urlCell = row.insertCell();
+                const link = document.createElement('a');
+                link.href = post.url;
+                link.target = '_blank';
+                link.textContent = 'View Post';
+                link.className = 'text-blue-500 hover:underline';
+                urlCell.appendChild(link);
+                
+                const actionsCell = row.insertCell();
+                
+                // Delete Button
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.className = 'action-button bg-red-600 text-white hover:bg-red-700';
+                deleteBtn.onclick = () => deletePost(post.order_id);
+                actionsCell.appendChild(deleteBtn);
             });
-            html += '</tbody></table>';
-            container.innerHTML = html;
         }
         
         /**
-         * Handles adding a new group definition.
+         * Removes a post from the data based on its order_id.
+         * @param {string} orderId The 4-digit order ID of the post to delete.
          */
-        document.getElementById('add-group-btn').addEventListener('click', () => {
-            const idInput = document.getElementById('group-id-input');
-            const nameInput = document.getElementById('group-name-input');
-            const errorDiv = document.getElementById('group-error');
-
-            const newId = idInput.value.trim();
-            const newName = nameInput.value.trim();
-            errorDiv.textContent = '';
-
-            if (!newId || !newName) {
-                errorDiv.textContent = 'Group ID and Name are required.';
-                return;
-            }
-            if (!/^\d+$/.test(newId)) {
-                errorDiv.textContent = 'Group ID must be a number (e.g., 2).';
-                return;
-            }
-            if (currentData.groups.some(g => g.id === newId)) {
-                errorDiv.textContent = `Group with ID '${newId}' already exists.`;
-                return;
-            }
-
-            currentData.groups.push({ id: newId, name: newName });
+        function deletePost(orderId) {
+            // Filter out the post with the matching order_id
+            const initialCount = feedData.posts.length;
+            feedData.posts = feedData.posts.filter(post => post.order_id !== orderId);
             
-            // Clear inputs
-            idInput.value = '';
-            nameInput.value = '';
-            
-            // Re-initialize UI to update selectors and output
-            initializeUI(); 
-        });
-
-        /**
-         * Handles inline editing of group properties (only name).
-         * @param {string} groupId The ID of the group to locate.
-         * @param {string} newName The new name value.
-         */
-        window.editGroup = (groupId, newName) => {
-            const trimmedName = newName.trim();
-            if (trimmedName === "") {
-                document.getElementById('group-error').textContent = 'Group name cannot be empty.';
-                initializeUI(); // Revert display
-                return;
-            }
-
-            const groupIndex = currentData.groups.findIndex(g => g.id === groupId);
-            if (groupIndex === -1) return;
-
-            // Apply the change
-            currentData.groups[groupIndex].name = trimmedName;
-
-            // Clear any old error message and re-render
-            document.getElementById('group-error').textContent = '';
-            initializeUI();
-        };
-
-
-        /**
-         * Removes a group definition if it's not currently used by any post.
-         * @param {string} groupId The ID of the group to delete.
-         */
-        window.deleteGroup = (groupId) => {
-            const isUsed = currentData.posts.some(p => p.group_id === groupId);
-            
-            if (isUsed) {
-                document.getElementById('group-error').textContent = `Cannot delete Group ${groupId}. It is still referenced by one or more posts. Please delete all posts in this group first.`;
-                return;
-            }
-            
-            // Remove the group
-            currentData.groups = currentData.groups.filter(g => g.id !== groupId);
-            document.getElementById('group-error').textContent = '';
-            
-            // Re-render
-            initializeUI();
-        };
-
-        // --- POST MANAGEMENT LOGIC ---
-
-        /**
-         * Renders the current posts into a table with editing and delete features.
-         */
-        function renderCurrentPosts() {
-            const container = document.getElementById('post-list-container');
-            const groupMap = new Map(currentData.groups.map(g => [g.id, g.name]));
-            
-            if (currentData.posts.length === 0) {
-                container.innerHTML = '<p class="text-gray-500">No posts added yet. Use section 2 to add your first post.</p>';
-                return;
-            }
-
-            let html = '<div class="overflow-x-auto"><table class="data-table"><thead><tr><th>Date Posted (MM.DD.YYYY)</th><th>Order ID</th><th>User Name</th><th>Group</th><th class="group-table-td">URL</th><th>Action</th></tr></thead><tbody>';
-            currentData.posts.forEach(post => {
-                const groupName = groupMap.get(post.group_id) || 'Unknown';
-                const displayDate = post.date_posted || '2000-01-01'; // Fallback date for sorting/input value
-                
-                // Convert YYYY-MM-DD (storage format) to MM.DD.YYYY (display format)
-                let formattedDate = 'N/A';
-                if (displayDate.length === 10) {
-                    const parts = displayDate.split('-'); // [YYYY, MM, DD]
-                    if (parts.length === 3) {
-                        formattedDate = `${parts[1]}.${parts[2]}.${parts[0]}`; // MM.DD.YYYY
-                    }
-                }
-                
-                // Create a dropdown for inline group editing
-                let groupSelectHtml = `<select onchange="editPost('${post.order_id}', 'group_id', this.value)" class="p-1 border rounded text-sm w-32">`;
-                currentData.groups.forEach(group => {
-                    const selected = post.group_id === group.id ? 'selected' : '';
-                    groupSelectHtml += `<option value="${group.id}" ${selected}>${group.id}: ${group.name}</option>`;
-                });
-                groupSelectHtml += `</select>`;
-
-                html += `
-                    <tr>
-                        <td class="relative">
-                            <!-- Display the requested MM.DD.YYYY format -->
-                            <span class="text-sm font-mono cursor-pointer hover:bg-indigo-100 p-1 rounded inline-block" 
-                                onclick="this.nextElementSibling.focus()">
-                                ${formattedDate}
-                            </span>
-                            <!-- Hidden date input for functionality (holds YYYY-MM-DD value and triggers date picker) -->
-                            <input type="date" value="${displayDate}" onchange="editPost('${post.order_id}', 'date_posted', this.value)" 
-                                class="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer"/>
-                        </td>
-                        <td>
-                            <!-- Added maxlength for 4-digit ID -->
-                            <input type="text" value="${post.order_id}" onchange="editPost('${post.order_id}', 'order_id', this.value)" 
-                                class="p-1 border rounded w-16 text-center text-sm font-mono" maxlength="4"/>
-                        </td>
-                        <td>@${post.username}</td>
-                        <td>${groupSelectHtml}</td>
-                        <td class="group-table-td">
-                            <a href="${post.url}" target="_blank" class="text-indigo-600 hover:text-indigo-800 underline">${post.url}</a>
-                        </td>
-                        <td>
-                            <button class="btn-danger p-1 text-xs" onclick="deletePost('${post.order_id}')">Delete</button>
-                        </td>
-                    </tr>
-                `;
-            });
-            html += '</tbody></table></div>';
-            container.innerHTML = html;
-        }
-
-        /**
-         * Removes a post from the data array.
-         * @param {string} orderId The order ID of the post to delete.
-         */
-        window.deletePost = (orderId) => {
-            currentData.posts = currentData.posts.filter(p => p.order_id !== orderId);
-            
-            // Re-render and update next ID
-            initializeUI();
-        };
-
-        /**
-         * Handles inline editing of post properties.
-         * @param {string} currentOrderId The original order ID (used to locate the post).
-         * @param {string} field The field being edited ('group_id', 'order_id', or 'date_posted').
-         * @param {string} value The new value.
-         */
-        window.editPost = (currentOrderId, field, value) => {
-            const postIndex = currentData.posts.findIndex(p => p.order_id === currentOrderId);
-            if (postIndex === -1) return;
-
-            document.getElementById('post-error').textContent = '';
-
-            if (field === 'date_posted') {
-                const trimmedValue = value.trim();
-                // We keep the internal storage format as YYYY-MM-DD for correct sorting
-                if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmedValue)) {
-                    document.getElementById('post-error').textContent = 'Invalid date format. Date must be YYYY-MM-DD internally.';
-                    initializeUI(); 
-                    return;
-                }
-                currentData.posts[postIndex][field] = trimmedValue;
-
-            } else if (field === 'order_id') {
-                const newValue = String(value).trim().padStart(4, '0');
-                
-                // 1. Basic format validation
-                if (!/^\d{4}$/.test(newValue)) {
-                    document.getElementById('post-error').textContent = 'Order ID must be a 4-digit number (e.g., 0005).';
-                    initializeUI(); // Revert display
-                    return;
-                }
-
-                // 2. Check for collision and bump existing posts (excluding the current one)
-                currentData.posts.forEach((post, index) => {
-                    // Only check other posts AND if their ID is the target ID or higher AND the date matches
-                    if (index !== postIndex && post.order_id >= newValue && post.date_posted === currentData.posts[postIndex].date_posted) {
-                        const nextNum = parseInt(post.order_id, 10) + 1;
-                        post.order_id = String(nextNum).padStart(4, '0');
-                    }
-                });
-
-                // 3. Apply the change to the current post
-                currentData.posts[postIndex].order_id = newValue;
-                
+            if (feedData.posts.length < initialCount) {
+                // Success message on delete
+                successDiv.classList.remove('message-error');
+                successDiv.classList.add('message-success');
+                successDiv.textContent = `Post with ID ${orderId} deleted.`;
+                errorDiv.textContent = '';
             } else {
-                // Handle Group ID change (simple update)
-                currentData.posts[postIndex][field] = value;
-            }
-
-            // Re-render UI to update tables/selectors and JSON output
-            initializeUI();
-        };
-        
-        // --- UTILITY LOGIC ---
-        
-        /**
-         * Populates the group selection dropdown for new posts.
-         */
-        function populateGroupSelect() {
-            const select = document.getElementById('post-group-select');
-            select.innerHTML = '';
-            
-            if (currentData.groups.length === 0) {
-                 select.innerHTML = '<option value="">No groups defined</option>';
-                 document.getElementById('add-post-btn').disabled = true;
-                 return;
-            }
-            document.getElementById('add-post-btn').disabled = false;
-
-            // Add a default prompt option
-            select.innerHTML = '<option value="" disabled selected>-- Select Group --</option>';
-
-            // Sort groups for readability
-            currentData.groups.sort((a, b) => a.id.localeCompare(b.id)).forEach(group => {
-                const option = document.createElement('option');
-                option.value = group.id;
-                option.textContent = `Group ${group.id}: ${group.name}`;
-                select.appendChild(option);
-            });
-        }
-
-        /**
-         * Calculates and displays the next available 4-digit order ID.
-         */
-        function updateNextOrderId() {
-            const posts = currentData.posts;
-            if (posts.length === 0) {
-                document.getElementById('next-order-id').textContent = '0000';
-                document.getElementById('post-order-id-input').value = '0000';
-                return;
+                 // Error message if post wasn't found (shouldn't happen with button clicks)
+                errorDiv.classList.remove('message-success');
+                errorDiv.classList.add('message-error');
+                errorDiv.textContent = `Error: Post with ID ${orderId} not found.`;
+                successDiv.textContent = '';
             }
             
-            // Get the maximum order_id from the *current* list
-            const maxId = posts.reduce((max, post) => Math.max(max, parseInt(post.order_id, 10)), -1);
-            const nextId = maxId >= 0 ? maxId + 1 : 0;
-            const formattedId = String(nextId).padStart(4, '0');
-
-            document.getElementById('next-order-id').textContent = formattedId;
-            document.getElementById('post-order-id-input').value = formattedId;
+            // Re-initialize UI to show the new table and hint
+            initializeUI(); 
+            // Clear message after a delay
+            setTimeout(() => {
+                successDiv.textContent = '';
+                errorDiv.textContent = '';
+                successDiv.classList.remove('message-success');
+                errorDiv.classList.remove('message-error');
+            }, 3000);
         }
 
         /**
-         * Renders the current JSON data to the output textarea.
+         * Parses an Instagram URL to extract the username.
+         * @param {string} url The Instagram post URL.
+         * @returns {{username: string, url: string} | null} Parsed data or null if invalid.
          */
-        function renderJsonOutput() {
-            const output = JSON.stringify(currentData, null, 2);
-            document.getElementById('json-output').value = output;
-        }
-
-
-        /**
-         * Parses a full Instagram URL to extract the username and canonical post URL.
-         * @param {string} fullUrl The full Instagram URL.
-         * @returns {{username: string, url: string, success: boolean}} 
-         */
-        function parseInstagramUrl(fullUrl) {
+        function parseInstagramUrl(url) {
             try {
-                const url = new URL(fullUrl);
-                const pathSegments = url.pathname.split('/').filter(p => p.length > 0);
-                
-                // Pattern 1: /username/p/post_id/
-                if (pathSegments.length >= 3 && pathSegments[1] === 'p') {
-                    const username = pathSegments[0];
-                    const postId = pathSegments[2];
-                    const canonicalUrl = `https://www.instagram.com/p/${postId}/`;
-                    return { username, url: canonicalUrl, success: true };
-                } 
-                
-                // Pattern 2: /p/post_id/ (short link, cannot extract username)
-                if (pathSegments.length >= 2 && pathSegments[0] === 'p') {
-                    const postId = pathSegments[1];
-                    const canonicalUrl = `https://www.instagram.com/p/${postId}/`;
-                    return { username: 'unknown_user', url: canonicalUrl, success: true };
-                }
+                const urlObj = new URL(url);
+                if (urlObj.hostname.includes('instagram.com') && urlObj.pathname.startsWith('/p/')) {
+                    // Pathname looks like /p/DJsyrbmRwP0/user_name/
+                    // The username can be inferred from the main page structure but is not
+                    // reliably in the /p/ URL. For simplicity, we will assume the
+                    // username is the first segment before /p/ in the path, or a placeholder
+                    // if that fails. (Original logic assumed username from path, let's keep it simple)
+                    
+                    // Simple regex to extract what looks like a username before /p/
+                    const match = url.match(/instagram\.com\/(.+?)\/p\//);
+                    let username = 'unknown_user';
+                    if (match && match[1] && !match[1].includes('p')) {
+                        username = match[1].replace(/\//g, '');
+                    }
+                    
+                    // Sanitize URL to ensure it is the permanent /p/ link structure
+                    // The component after /p/ is the post ID, anything after that should be removed for the embed link
+                    const parts = urlObj.pathname.split('/').filter(p => p);
+                    const pIndex = parts.indexOf('p');
+                    let cleanUrl = url;
 
+                    if (pIndex !== -1 && pIndex + 1 < parts.length) {
+                        const postCode = parts[pIndex + 1];
+                        // Reconstruct the clean URL without any trailing username/slug
+                        cleanUrl = `https://www.instagram.com/p/${postCode}/`;
+                        
+                        // If the URL was more complex, try to guess username from a preceding segment if available
+                        if (pIndex > 0) {
+                            username = parts[pIndex - 1];
+                        }
+                    }
+
+                    return {
+                        username: username,
+                        url: cleanUrl
+                    };
+                }
             } catch (e) {
-                // If URL parsing fails
+                console.error("URL parsing error:", e);
+                return null;
             }
-            return { username: '', url: '', success: false };
+            return null;
         }
 
         /**
-         * Handles adding a new post, including the order ID bumping logic.
+         * Handles the button click to add a new post.
          */
-        document.getElementById('add-post-btn').addEventListener('click', () => {
-            const urlInput = document.getElementById('post-url-input');
-            const groupSelect = document.getElementById('post-group-select');
-            const orderIdInput = document.getElementById('post-order-id-input');
-            const dateInput = document.getElementById('post-date-input');
-            
-            const errorDiv = document.getElementById('post-error');
-            const successDiv = document.getElementById('post-success');
+        addPostButton.addEventListener('click', () => {
+            const url = urlInput.value.trim();
+            const orderId = orderIdInput.value.trim().padStart(4, '0');
+            const groupId = groupIdSelect.value;
+            const postDate = dateInput.value; // Get date input (YYYY-MM-DD format)
 
-            const fullUrl = urlInput.value.trim();
-            const groupId = groupSelect.value;
-            const postDate = dateInput.value.trim(); 
-            
-            // Get the order ID, pad it, and ensure it's a string
-            let orderId = String(orderIdInput.value).trim().padStart(4, '0'); 
-
-            errorDiv.textContent = '';
+            // Clear previous messages
             successDiv.textContent = '';
+            errorDiv.textContent = '';
+            successDiv.classList.remove('message-success', 'message-error');
+            errorDiv.classList.remove('message-success', 'message-error');
 
-            if (!fullUrl) {
-                errorDiv.textContent = 'Instagram URL is required.';
-                return;
-            }
-            if (!groupId) {
-                errorDiv.textContent = 'Please select a group.';
-                return;
-            }
-            if (!postDate) { 
-                errorDiv.textContent = 'Post Date is required.';
+            if (!url || !orderId || !groupId || !postDate) {
+                errorDiv.classList.add('message-error');
+                errorDiv.textContent = 'Please fill out all fields (URL, Order ID, Date, Group).';
                 return;
             }
 
-            const parsed = parseInstagramUrl(fullUrl);
+            const parsed = parseInstagramUrl(url);
 
-            if (!parsed.success || !parsed.url) {
-                errorDiv.textContent = 'Could not parse URL. Ensure the URL contains a post ID.';
-                return;
-            }
-            
-            if (currentData.posts.some(p => p.url === parsed.url)) {
-                 errorDiv.textContent = 'This post URL (canonical form) already exists in the data.';
-                 return;
-            }
-
-            // 1. Validate that the orderId is a valid 4-digit string
-            if (!/^\d{4}$/.test(orderId)) {
-                errorDiv.textContent = 'Order ID must be a 4-digit number (e.g., 0005).';
+            if (!parsed) {
+                errorDiv.classList.add('message-error');
+                errorDiv.textContent = 'Invalid Instagram URL format. Must be a link to a post (e.g., /p/...).';
                 return;
             }
 
-            // 2. Check for collision and bump existing posts
-            if (currentData.posts.some(p => p.order_id === orderId && p.date_posted === postDate)) {
+            // 1. Check if the specified Order ID already exists for collision detection
+            if (feedData.posts.some(p => p.order_id === orderId && p.date_posted === postDate)) {
                 // Collision detected only if ID AND Date match. Bump all posts with matching date and ID >= the target ID
-                currentData.posts.forEach(post => {
+                feedData.posts.forEach(post => {
                     if (post.date_posted === postDate && post.order_id >= orderId) {
                         const nextNum = parseInt(post.order_id, 10) + 1;
                         post.order_id = String(nextNum).padStart(4, '0');
@@ -569,19 +543,48 @@
                 date_posted: postDate // NEW FIELD
             };
 
-            currentData.posts.push(newPost);
+            feedData.posts.push(newPost);
             
             // Success message and clear
+            successDiv.classList.add('message-success');
             successDiv.textContent = `Post added for @${newPost.username} (Order ID: ${newPost.order_id}).`;
             urlInput.value = '';
             dateInput.value = ''; // Clear date input
             
             // Re-initialize UI to update next order ID and output
             initializeUI(); 
+            
+            // Clear message after a delay
+            setTimeout(() => {
+                successDiv.textContent = '';
+                errorDiv.textContent = '';
+                successDiv.classList.remove('message-success');
+                errorDiv.classList.remove('message-error');
+            }, 5000);
         });
+        
+        /**
+         * Initializes or re-initializes the UI elements.
+         */
+        function initializeUI() {
+            // Update next order ID hint
+            const nextId = getNextOrderId();
+            hint.textContent = `Next available: ${nextId}`;
+            orderIdInput.value = nextId;
+            
+            // Populate groups
+            populateGroupSelect();
+            
+            // Render the table
+            renderPostsTable();
+        }
 
-        // Start loading data when the page loads
-        document.addEventListener('DOMContentLoaded', loadData);
+        // Start loading data and set up theme when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            setupDarkMode(); // Initialize dark mode first
+            loadData();
+            saveButton.addEventListener('click', saveData);
+        });
     </script>
 </body>
 </html>
